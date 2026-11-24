@@ -672,30 +672,151 @@ function desenharCena() {
     ctx.fillRect(configNivel.distanciaMeta - 23, CHAO_Y - 90, 34, 24);
   }
 
-  // Soldado (pisca quando está invulnerável após tomar dano)
-  const piscando =
-    estadoJogo.frameAtual < estadoJogo.invulneravelAte &&
-    Math.floor(estadoJogo.frameAtual / 4) % 2 === 0;
+  // Soldado
+  desenharSoldado()
 
-  if (!piscando) {
-    ctx.fillStyle = "#4dabf7";
-    ctx.fillRect(soldado.x, soldado.y, soldado.largura, soldado.alturaAtual);
+  function desenharSoldado() {
+  const centroX = soldado.x + soldado.largura / 2;
+  const baseY = soldado.y + soldado.alturaAtual;
+  const andando = Math.abs(soldado.vx) > 0.1 && soldado.noChao;
+  const cicloPasso = andando ? Math.sin(estadoJogo.frameAtual * 0.35) : 0;
+  const atirouAgora = estadoJogo.frameAtual - estadoJogo.ultimoTiroFrame <= 3;
 
-    // Capacete/visor
-    ctx.fillStyle = "#ffd43b";
-    const visorX = soldado.direcao === 1 ? soldado.x + 18 : soldado.x + 4;
-    ctx.fillRect(visorX, soldado.y + 6, 12, 8);
+  ctx.save();
+  // Espelha horizontalmente quando o soldado vira para a esquerda
+  ctx.translate(centroX, baseY);
+  ctx.scale(soldado.direcao, 1);
 
-    // Arma apontando para cima ou para frente
-    ctx.fillStyle = "#ced4da";
+  if (soldado.agachado) {
+    // --- POSE AGACHADO ---
+    // Perna traseira dobrada no chão
+    ctx.fillStyle = "#2b3a2e";
+    ctx.fillRect(-12, -10, 16, 7);
+    ctx.fillStyle = "#1a1d20"; // Bota
+    ctx.fillRect(-15, -7, 8, 7);
+
+    // Perna dianteira flexionada
+    ctx.fillStyle = "#3b4f3f";
+    ctx.fillRect(-2, -14, 12, 9);
+    ctx.fillStyle = "#1a1d20"; // Bota
+    ctx.fillRect(4, -7, 10, 7);
+
+    // Tronco e colete tático
+    ctx.fillStyle = "#4a634e";
+    ctx.fillRect(-9, -26, 18, 15);
+    ctx.fillStyle = "#2d3b30"; // Placa do colete
+    ctx.fillRect(-5, -24, 12, 11);
+
+    // Cabeça e capacete
+    ctx.fillStyle = "#d9a077"; // Rosto
+    ctx.fillRect(-4, -34, 10, 8);
+    ctx.fillStyle = "#2f4233"; // Capacete
+    ctx.beginPath();
+    ctx.arc(1, -33, 7, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(-6, -34, 14, 3);
+    ctx.fillStyle = "#38bdf8"; // Óculos tático
+    ctx.fillRect(2, -31, 6, 3);
+
+    // Fuzil na posição baixa
+    desenharFuzil(2, -18, 0, atirouAgora);
+  } else {
+    // --- POSE EM PÉ / CORRENDO / PULANDO ---
+    const deslocamentoPerna = soldado.noChao ? cicloPasso * 7 : 5;
+    const elevacaoPulo = soldado.noChao ? 0 : -4;
+    const balancoTronco = andando ? Math.abs(cicloPasso) * 1.5 : 0;
+
+    // Perna traseira
+    ctx.fillStyle = "#2b3a2e";
+    ctx.fillRect(-5 - deslocamentoPerna, -22 + elevacaoPulo, 8, 16);
+    ctx.fillStyle = "#1a1d20"; // Bota traseira
+    ctx.fillRect(-5 - deslocamentoPerna, -7 + elevacaoPulo, 10, 7);
+
+    // Perna dianteira
+    ctx.fillStyle = "#3b4f3f";
+    ctx.fillRect(-3 + deslocamentoPerna, -22, 8, 16);
+    ctx.fillStyle = "#1a1d20"; // Bota dianteira
+    ctx.fillRect(-3 + deslocamentoPerna, -7, 11, 7);
+
+    // Mochila tática nas costas
+    ctx.fillStyle = "#263329";
+    ctx.fillRect(-13, -42 + balancoTronco, 6, 17);
+
+    // Tronco (uniforme + colete balístico)
+    ctx.fillStyle = "#4a634e";
+    ctx.fillRect(-8, -44 + balancoTronco, 16, 23);
+    ctx.fillStyle = "#2d3b30"; // Colete tático
+    ctx.fillRect(-6, -42 + balancoTronco, 13, 17);
+    ctx.fillStyle = "#5c7a62"; // Bolsos do colete
+    ctx.fillRect(-4, -33 + balancoTronco, 4, 6);
+    ctx.fillRect(1, -33 + balancoTronco, 4, 6);
+
+    // Pescoço e cabeça
+    ctx.fillStyle = "#d9a077";
+    ctx.fillRect(-3, -47 + balancoTronco, 6, 4);
+    ctx.fillRect(-5, -56 + balancoTronco, 11, 10);
+
+    // Capacete militar e visor tático
+    ctx.fillStyle = "#2f4233";
+    ctx.beginPath();
+    ctx.arc(0, -54 + balancoTronco, 7.5, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(-7, -55 + balancoTronco, 15, 3);
+    ctx.fillStyle = "#38bdf8"; // Visor
+    ctx.fillRect(1, -52 + balancoTronco, 6, 3.5);
+
+    // Braços e fuzil (mirando para cima ou para frente)
     if (soldado.olhandoCima) {
-      ctx.fillRect(soldado.x + soldado.largura / 2 - 3, soldado.y - 14, 6, 16);
+      desenharFuzil(3, -38 + balancoTronco, -Math.PI / 2, atirouAgora);
     } else {
-      const armaX = soldado.direcao === 1 ? soldado.x + soldado.largura - 2 : soldado.x - 14;
-      const armaY = soldado.y + (soldado.agachado ? 11 : 19);
-      ctx.fillRect(armaX, armaY, 16, 6);
+      desenharFuzil(2, -35 + balancoTronco, 0, atirouAgora);
     }
   }
+
+  ctx.restore();
+}
+
+function desenharFuzil(origemX, origemY, angulo, atirouAgora) {
+  ctx.save();
+  ctx.translate(origemX, origemY);
+  ctx.rotate(angulo);
+
+  // Braço de apoio
+  ctx.fillStyle = "#4a634e";
+  ctx.fillRect(-4, -2, 12, 5);
+  ctx.fillStyle = "#d9a077"; // Mão
+  ctx.fillRect(7, -2, 4, 4);
+
+  // Coronha e corpo do fuzil
+  ctx.fillStyle = "#1f2428";
+  ctx.fillRect(-8, -3, 24, 5);
+
+  // Carregador curvado
+  ctx.fillStyle = "#111417";
+  ctx.fillRect(3, 2, 4, 7);
+
+  // Mira óptica no topo
+  ctx.fillStyle = "#343a40";
+  ctx.fillRect(1, -6, 7, 3);
+
+  // Cano estendido
+  ctx.fillStyle = "#495057";
+  ctx.fillRect(16, -2, 9, 3);
+
+  // Clarão do disparo (muzzle flash)
+  if (atirouAgora) {
+    ctx.fillStyle = "#ffd43b";
+    ctx.beginPath();
+    ctx.moveTo(25, -1);
+    ctx.lineTo(35, -6);
+    ctx.lineTo(32, -1);
+    ctx.lineTo(36, 4);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
 
   // Inimigos
   for (let i = 0; i < estadoJogo.inimigos.length; i++) {
@@ -771,7 +892,7 @@ function loopPrincipal() {
     atualizarProjeteis();
     atualizarHUD();
   }
-
+  
   desenharCena();
   requestAnimationFrame(loopPrincipal);
 }
