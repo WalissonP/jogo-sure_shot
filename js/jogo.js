@@ -102,16 +102,18 @@ const estadoJogo = {
 const soldado = {
   x: 120,
   y: CHAO_Y - 56,
+  larguraEmPe: 34,
+  larguraDeitado: 52,
   largura: 34,
   alturaEmPe: 56,
-  alturaAgachado: 32,
+  alturaDeitado: 20,
   alturaAtual: 56,
   vx: 0,
   vy: 0,
   velocidade: 4.5,
   forcaPulo: -13.5,
   noChao: false,
-  agachado: false,
+  deitado: false,
   olhandoCima: false,
   direcao: 1, // 1 = direita, -1 = esquerda
   vida: 100,
@@ -135,6 +137,9 @@ function iniciarPartida() {
 
   soldado.vida = soldado.vidaMaxima;
   soldado.direcao = 1;
+  soldado.deitado = false;
+  soldado.largura = soldado.larguraEmPe;
+  soldado.alturaAtual = soldado.alturaEmPe;
 
   overlayInicio.classList.add("oculto");
   overlayFim.classList.add("oculto");
@@ -159,6 +164,9 @@ function carregarNivel(indice) {
   estadoJogo.inclinacaoDano = 0;
   estadoJogo.avisoNivelFrames = 140;
 
+  soldado.deitado = false;
+  soldado.largura = soldado.larguraEmPe;
+  soldado.alturaAtual = soldado.alturaEmPe;
   soldado.x = 100;
   soldado.y = CHAO_Y - soldado.alturaEmPe;
   soldado.vx = 0;
@@ -349,24 +357,28 @@ function atualizarSoldado() {
   const pular = teclas["Space"];
   const atirar = teclas["KeyJ"] || teclas["KeyZ"];
 
-  if (baixo && soldado.noChao) {
-    if (!soldado.agachado) {
-      soldado.y += soldado.alturaEmPe - soldado.alturaAgachado;
-    }
-    soldado.agachado = true;
-    soldado.alturaAtual = soldado.alturaAgachado;
-  } else {
-    if (soldado.agachado) {
-      soldado.y -= soldado.alturaEmPe - soldado.alturaAgachado;
-    }
-    soldado.agachado = false;
+  const querDeitar = Boolean(baixo && soldado.noChao);
+
+  if (querDeitar && !soldado.deitado) {
+    const centroXAntigo = soldado.x + soldado.largura / 2;
+    soldado.y += soldado.alturaEmPe - soldado.alturaDeitado;
+    soldado.deitado = true;
+    soldado.largura = soldado.larguraDeitado;
+    soldado.alturaAtual = soldado.alturaDeitado;
+    soldado.x = centroXAntigo - soldado.largura / 2;
+  } else if (!querDeitar && soldado.deitado) {
+    const centroXAntigo = soldado.x + soldado.largura / 2;
+    soldado.y -= soldado.alturaEmPe - soldado.alturaDeitado;
+    soldado.deitado = false;
+    soldado.largura = soldado.larguraEmPe;
     soldado.alturaAtual = soldado.alturaEmPe;
+    soldado.x = centroXAntigo - soldado.largura / 2;
   }
 
-  soldado.olhandoCima = Boolean(cima && !soldado.agachado);
+  soldado.olhandoCima = Boolean(cima && !soldado.deitado);
 
   const emRecuoDano = estadoJogo.danoSoldadoFrames > 8;
-  const fatorVelocidade = soldado.agachado ? 0.45 : 1;
+  const fatorVelocidade = soldado.deitado ? 0.55 : 1;
 
   if (!emRecuoDano) {
     if (esquerda && !direita) {
@@ -383,7 +395,7 @@ function atualizarSoldado() {
     }
   }
 
-  if (pular && soldado.noChao) {
+  if (pular && soldado.noChao && !soldado.deitado) {
     soldado.vy = soldado.forcaPulo;
     soldado.noChao = false;
   }
@@ -506,9 +518,9 @@ function dispararTiroSoldado() {
       vy: -velocidadeTiro,
       nivelTiro: "alto"
     });
-  } else {
+  } else if (soldado.deitado) {
     const saidaX = soldado.direcao === 1 ? soldado.x + soldado.largura : soldado.x - 14;
-    const saidaY = soldado.y + (soldado.agachado ? 12 : 20);
+    const saidaY = soldado.y + 9;
     estadoJogo.tirosJogador.push({
       x: saidaX,
       y: saidaY,
@@ -516,7 +528,19 @@ function dispararTiroSoldado() {
       altura: 6,
       vx: velocidadeTiro * soldado.direcao,
       vy: 0,
-      nivelTiro: soldado.agachado ? "baixo" : "medio"
+      nivelTiro: "baixo"
+    });
+  } else {
+    const saidaX = soldado.direcao === 1 ? soldado.x + soldado.largura : soldado.x - 14;
+    const saidaY = soldado.y + 20;
+    estadoJogo.tirosJogador.push({
+      x: saidaX,
+      y: saidaY,
+      largura: 14,
+      altura: 6,
+      vx: velocidadeTiro * soldado.direcao,
+      vy: 0,
+      nivelTiro: "medio"
     });
   }
 }
@@ -1112,6 +1136,7 @@ function desenharSoldado() {
   const andando = Math.abs(soldado.vx) > 0.1 && soldado.noChao;
   const paradoNoChao = !andando && soldado.noChao;
   const cicloPasso = andando ? Math.sin(estadoJogo.frameAtual * 0.35) : 0;
+  const cicloRastejar = andando && soldado.deitado ? Math.sin(estadoJogo.frameAtual * 0.32) : 0;
   const cicloRespiracao = paradoNoChao ? Math.sin(estadoJogo.frameAtual * 0.08) : 0;
   const atirouAgora = estadoJogo.frameAtual - estadoJogo.ultimoTiroFrame <= 3;
 
@@ -1123,46 +1148,51 @@ function desenharSoldado() {
     ctx.rotate(estadoJogo.inclinacaoDano);
   }
 
-  if (soldado.agachado) {
-    const respiracaoAgachadoY = paradoNoChao ? cicloRespiracao * 0.9 : 0;
-    const expansaoAgachado = paradoNoChao ? Math.max(0, cicloRespiracao) * 0.7 : 0;
+  if (soldado.deitado) {
+    // Animação de andar deitado (rastejando rente ao chão)
+    const impulsoRastejarX = cicloRastejar * 2.5;
+    const elevacaoTroncoY = andando ? Math.abs(cicloRastejar) * -1.8 : cicloRespiracao * 0.5;
+    const movimentoPerna = andando ? cicloRastejar * 4 : 0;
+    const movimentoCotovelo = andando ? -cicloRastejar * 3 : 0;
 
+    // Pernas e coturnos estendidos atrás, alternando o apoio no chão
     ctx.fillStyle = "#2b3a2e";
-    ctx.fillRect(-12, -10, 16, 7);
+    ctx.fillRect(-24 + movimentoPerna * 0.6, -8 + Math.min(0, movimentoPerna * 0.4), 13, 5);
     ctx.fillStyle = "#1a1d20";
-    ctx.fillRect(-15, -7, 8, 7);
+    ctx.fillRect(-26 + movimentoPerna * 0.6, -6 + Math.min(0, movimentoPerna * 0.4), 5, 6);
 
     ctx.fillStyle = "#3b4f3f";
-    ctx.fillRect(-2, -14, 12, 9);
+    ctx.fillRect(-22 - movimentoPerna * 0.6, -6 + Math.min(0, -movimentoPerna * 0.4), 13, 5);
     ctx.fillStyle = "#1a1d20";
-    ctx.fillRect(4, -7, 10, 7);
+    ctx.fillRect(-24 - movimentoPerna * 0.6, -5 + Math.min(0, -movimentoPerna * 0.4), 5, 5);
 
+    // Mochila tática nas costas
+    ctx.fillStyle = "#263329";
+    ctx.fillRect(-13 + impulsoRastejarX * 0.5, -15 + elevacaoTroncoY, 7, 8);
+
+    // Tronco deitado horizontalmente
     ctx.fillStyle = "#4a634e";
-    ctx.fillRect(
-      -9,
-      -26 + respiracaoAgachadoY - expansaoAgachado * 0.4,
-      18 + expansaoAgachado,
-      15 + expansaoAgachado * 0.4
-    );
+    ctx.fillRect(-12 + impulsoRastejarX * 0.5, -14 + elevacaoTroncoY, 20, 9);
     ctx.fillStyle = "#2d3b30";
-    ctx.fillRect(
-      -5,
-      -24 + respiracaoAgachadoY - expansaoAgachado * 0.4,
-      12 + expansaoAgachado,
-      11 + expansaoAgachado * 0.4
-    );
+    ctx.fillRect(-10 + impulsoRastejarX * 0.5, -13 + elevacaoTroncoY, 16, 6);
 
+    // Cabeça e capacete voltados para a frente, rente ao solo
     ctx.fillStyle = "#d9a077";
-    ctx.fillRect(-4, -34 + respiracaoAgachadoY, 10, 8);
+    ctx.fillRect(8 + impulsoRastejarX * 0.4, -12 + elevacaoTroncoY * 0.8, 8, 7);
     ctx.fillStyle = "#2f4233";
     ctx.beginPath();
-    ctx.arc(1, -33 + respiracaoAgachadoY, 7, Math.PI, 0);
+    ctx.arc(12 + impulsoRastejarX * 0.4, -11 + elevacaoTroncoY * 0.8, 6.5, Math.PI * 0.85, Math.PI * 1.95);
     ctx.fill();
-    ctx.fillRect(-6, -34 + respiracaoAgachadoY, 14, 3);
+    ctx.fillRect(6 + impulsoRastejarX * 0.4, -14 + elevacaoTroncoY * 0.8, 12, 2.5);
     ctx.fillStyle = "#38bdf8";
-    ctx.fillRect(2, -31 + respiracaoAgachadoY, 6, 3);
+    ctx.fillRect(13 + impulsoRastejarX * 0.4, -10 + elevacaoTroncoY * 0.8, 4, 2.5);
 
-    desenharFuzil(2, -18 + respiracaoAgachadoY, 0, atirouAgora);
+    // Braço de apoio / cotovelo rastejando
+    ctx.fillStyle = "#4a634e";
+    ctx.fillRect(2 + movimentoCotovelo * 0.5, -6 + Math.min(0, movimentoCotovelo * 0.4), 8, 5);
+
+    // Fuzil apoiado na linha do tiro deitado
+    desenharFuzil(11 + impulsoRastejarX * 0.4, -9 + elevacaoTroncoY * 0.6, 0, atirouAgora);
   } else {
     const deslocamentoPerna = soldado.noChao ? cicloPasso * 7 : 5;
     const elevacaoPulo = soldado.noChao ? 0 : -4;
