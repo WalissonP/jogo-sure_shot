@@ -363,3 +363,420 @@ function dispararTiroSoldado() {
   }
 }
 
+// =========================================================
+// 7. INIMIGOS E BOSS
+// =========================================================
+function gerarInimigos() {
+  const configNivel = NIVEIS[estadoJogo.nivelIndice];
+  if (estadoJogo.frameAtual % configNivel.intervaloSpawn !== 0) return;
+
+  // No nível 5 só gera poucos drones se o boss ainda estiver vivo
+  if (configNivel.numero === 5 && (!estadoJogo.boss || estadoJogo.inimigos.length >= 2)) {
+    return;
+  }
+
+  const tipos = configNivel.tiposInimigos;
+  const tipoEscolhido = tipos[Math.floor(Math.random() * tipos.length)];
+  const spawnX =
+    configNivel.numero === 5
+      ? canvas.width - 40
+      : Math.min(estadoJogo.cameraX + canvas.width + 30, configNivel.distanciaMeta - 80);
+
+  if (tipoEscolhido === "rastejador") {
+    estadoJogo.inimigos.push({
+      tipo: "rastejador",
+      x: spawnX,
+      y: CHAO_Y - 34,
+      largura: 36,
+      altura: 34,
+      vx: -2.1,
+      vy: 0,
+      vida: 1,
+      pontos: 50,
+      cor: "#e06c75"
+    });
+  } else if (tipoEscolhido === "saltador") {
+    estadoJogo.inimigos.push({
+      tipo: "saltador",
+      x: spawnX,
+      y: CHAO_Y - 40,
+      largura: 34,
+      altura: 40,
+      vx: -2.7,
+      vy: -9,
+      vida: 2,
+      pontos: 80,
+      cor: "#d19a66"
+    });
+  } else if (tipoEscolhido === "atirador") {
+    estadoJogo.inimigos.push({
+      tipo: "atirador",
+      x: spawnX,
+      y: CHAO_Y - 48,
+      largura: 36,
+      altura: 48,
+      vx: -1.6,
+      vy: 0,
+      vida: 2,
+      pontos: 110,
+      cor: "#c678dd",
+      ultimoTiro: estadoJogo.frameAtual
+    });
+  } else if (tipoEscolhido === "drone") {
+    estadoJogo.inimigos.push({
+      tipo: "drone",
+      x: spawnX,
+      y: CHAO_Y - 165 - Math.random() * 50,
+      largura: 38,
+      altura: 24,
+      vx: -3.1,
+      vy: 0,
+      vida: 1,
+      pontos: 90,
+      cor: "#56b6c2"
+    });
+  } else if (tipoEscolhido === "blindado") {
+    estadoJogo.inimigos.push({
+      tipo: "blindado",
+      x: spawnX,
+      y: CHAO_Y - 58,
+      largura: 48,
+      altura: 58,
+      vx: -1.4,
+      vy: 0,
+      vida: 5,
+      pontos: 180,
+      cor: "#e5c07b"
+    });
+  }
+}
+
+function atualizarInimigos() {
+  for (let i = estadoJogo.inimigos.length - 1; i >= 0; i--) {
+    const inimigo = estadoJogo.inimigos[i];
+    inimigo.x += inimigo.vx;
+
+    if (inimigo.tipo === "saltador") {
+      inimigo.vy += GRAVIDADE;
+      inimigo.y += inimigo.vy;
+      if (inimigo.y + inimigo.altura >= CHAO_Y) {
+        inimigo.y = CHAO_Y - inimigo.altura;
+        inimigo.vy = -10.5;
+      }
+    }
+
+    if (inimigo.tipo === "drone") {
+      inimigo.y += Math.sin(estadoJogo.frameAtual * 0.08 + i) * 1.3;
+    }
+
+    if (inimigo.tipo === "atirador" && estadoJogo.frameAtual - inimigo.ultimoTiro >= 110) {
+      const dir = soldado.x < inimigo.x ? -1 : 1;
+      estadoJogo.tirosInimigos.push({
+        x: inimigo.x,
+        y: inimigo.y + 16,
+        largura: 12,
+        altura: 6,
+        vx: 5 * dir,
+        vy: 0
+      });
+      inimigo.ultimoTiro = estadoJogo.frameAtual;
+    }
+
+    // Colisão inimigo x soldado
+    if (colidiu(soldado, inimigo)) {
+      aplicarDanoSoldado(15);
+    }
+
+    // Remove inimigos que ficaram muito para trás
+    if (inimigo.x + inimigo.largura < estadoJogo.cameraX - 100) {
+      estadoJogo.inimigos.splice(i, 1);
+    }
+  }
+}
+
+function atualizarBoss() {
+  const boss = estadoJogo.boss;
+  if (!boss) return;
+
+  boss.x += boss.vx;
+  if (boss.x <= 460 || boss.x + boss.largura >= canvas.width - 20) {
+    boss.vx *= -1;
+  }
+
+  // Ataque do Boss: tiro baixo e tiro alto alternados
+  if (estadoJogo.frameAtual - boss.ultimoTiro >= boss.cadenciaTiro) {
+    const alturaTiro = boss.vida % 2 === 0 ? boss.y + boss.altura - 24 : boss.y + 38;
+    estadoJogo.tirosInimigos.push({
+      x: boss.x - 12,
+      y: alturaTiro,
+      largura: 16,
+      altura: 8,
+      vx: -6.2,
+      vy: 0
+    });
+    boss.ultimoTiro = estadoJogo.frameAtual;
+  }
+
+  if (colidiu(soldado, boss)) {
+    aplicarDanoSoldado(20);
+  }
+}
+
+// =========================================================
+// 8. PROJÉTEIS E COLISÕES
+// =========================================================
+function atualizarProjeteis() {
+  // Tiros do soldado
+  for (let i = estadoJogo.tirosJogador.length - 1; i >= 0; i--) {
+    const tiro = estadoJogo.tirosJogador[i];
+    tiro.x += tiro.vx;
+    tiro.y += tiro.vy;
+
+    let acertou = false;
+
+    // Verifica acerto nos inimigos comuns
+    for (let j = estadoJogo.inimigos.length - 1; j >= 0; j--) {
+      const inimigo = estadoJogo.inimigos[j];
+      if (colidiu(tiro, inimigo)) {
+        inimigo.vida -= 1;
+        acertou = true;
+        if (inimigo.vida <= 0) {
+          estadoJogo.pontuacao += inimigo.pontos;
+          estadoJogo.inimigos.splice(j, 1);
+        }
+        break;
+      }
+    }
+
+    // Verifica acerto no Boss
+    if (!acertou && estadoJogo.boss && colidiu(tiro, estadoJogo.boss)) {
+      estadoJogo.boss.vida -= 1;
+      acertou = true;
+      estadoJogo.pontuacao += 25;
+
+      if (estadoJogo.boss.vida <= 0) {
+        estadoJogo.pontuacao += 1000;
+        estadoJogo.boss = null;
+        atualizarHUD();
+        finalizarPartida(true);
+        return;
+      }
+    }
+
+    const foraDaTela =
+      tiro.x < estadoJogo.cameraX - 40 ||
+      tiro.x > estadoJogo.cameraX + canvas.width + 40 ||
+      tiro.y < -40;
+
+    if (acertou || foraDaTela) {
+      estadoJogo.tirosJogador.splice(i, 1);
+    }
+  }
+
+  // Tiros dos inimigos
+  for (let i = estadoJogo.tirosInimigos.length - 1; i >= 0; i--) {
+    const tiro = estadoJogo.tirosInimigos[i];
+    tiro.x += tiro.vx;
+    tiro.y += tiro.vy;
+
+    const hitboxSoldado = {
+      x: soldado.x,
+      y: soldado.y,
+      largura: soldado.largura,
+      altura: soldado.alturaAtual
+    };
+
+    if (colidiu(tiro, hitboxSoldado)) {
+      aplicarDanoSoldado(12);
+      estadoJogo.tirosInimigos.splice(i, 1);
+      continue;
+    }
+
+    if (tiro.x < estadoJogo.cameraX - 50 || tiro.x > estadoJogo.cameraX + canvas.width + 50) {
+      estadoJogo.tirosInimigos.splice(i, 1);
+    }
+  }
+}
+
+function aplicarDanoSoldado(dano) {
+  if (estadoJogo.frameAtual < estadoJogo.invulneravelAte) return;
+
+  soldado.vida = Math.max(0, soldado.vida - dano);
+  estadoJogo.invulneravelAte = estadoJogo.frameAtual + 45;
+
+  if (soldado.vida <= 0) {
+    atualizarHUD();
+    finalizarPartida(false);
+  }
+}
+
+function colidiu(a, b) {
+  const alturaA = a.altura !== undefined ? a.altura : a.alturaAtual;
+  const alturaB = b.altura !== undefined ? b.altura : b.alturaAtual;
+
+  return (
+    a.x < b.x + b.largura &&
+    a.x + a.largura > b.x &&
+    a.y < b.y + alturaB &&
+    a.y + alturaA > b.y
+  );
+}
+
+// =========================================================
+// 9. ATUALIZAÇÃO DO DOM (HUD) E RENDERIZAÇÃO NO CANVAS
+// =========================================================
+function atualizarHUD() {
+  const configNivel = NIVEIS[estadoJogo.nivelIndice];
+  hudNivel.textContent = `${configNivel.numero} / ${NIVEIS.length}`;
+  hudVida.textContent = soldado.vida;
+  hudPontos.textContent = estadoJogo.pontuacao;
+
+  if (configNivel.numero < 5) {
+    const pct = Math.min(100, Math.floor((soldado.x / (configNivel.distanciaMeta - 40)) * 100));
+    hudProgresso.textContent = `${pct}%`;
+  } else {
+    hudProgresso.textContent = estadoJogo.boss ? "BOSS!" : "100%";
+  }
+}
+
+function desenharCena() {
+  const configNivel = NIVEIS[estadoJogo.nivelIndice];
+
+  // Fundo do nível
+  ctx.fillStyle = configNivel.corCeu;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.save();
+  ctx.translate(-estadoJogo.cameraX, 0);
+
+  // Chão
+  ctx.fillStyle = configNivel.corChao;
+  ctx.fillRect(0, CHAO_Y, configNivel.distanciaMeta + 200, canvas.height - CHAO_Y);
+
+  // Linha de superfície do chão
+  ctx.fillStyle = "#5c7a62";
+  ctx.fillRect(0, CHAO_Y, configNivel.distanciaMeta + 200, 5);
+
+  // Plataformas
+  ctx.fillStyle = "#6c7a89";
+  for (let i = 0; i < estadoJogo.plataformas.length; i++) {
+    const plat = estadoJogo.plataformas[i];
+    ctx.fillRect(plat.x, plat.y, plat.largura, plat.altura);
+  }
+
+  // Bandeira/Portal de fim de setor (Níveis 1 a 4)
+  if (configNivel.numero < 5) {
+    ctx.fillStyle = "#f0b429";
+    ctx.fillRect(configNivel.distanciaMeta - 35, CHAO_Y - 90, 12, 90);
+    ctx.fillStyle = "#38b2ac";
+    ctx.fillRect(configNivel.distanciaMeta - 23, CHAO_Y - 90, 34, 24);
+  }
+
+  // Soldado (pisca quando está invulnerável após tomar dano)
+  const piscando =
+    estadoJogo.frameAtual < estadoJogo.invulneravelAte &&
+    Math.floor(estadoJogo.frameAtual / 4) % 2 === 0;
+
+  if (!piscando) {
+    ctx.fillStyle = "#4dabf7";
+    ctx.fillRect(soldado.x, soldado.y, soldado.largura, soldado.alturaAtual);
+
+    // Capacete/visor
+    ctx.fillStyle = "#ffd43b";
+    const visorX = soldado.direcao === 1 ? soldado.x + 18 : soldado.x + 4;
+    ctx.fillRect(visorX, soldado.y + 6, 12, 8);
+
+    // Arma apontando para cima ou para frente
+    ctx.fillStyle = "#ced4da";
+    if (soldado.olhandoCima) {
+      ctx.fillRect(soldado.x + soldado.largura / 2 - 3, soldado.y - 14, 6, 16);
+    } else {
+      const armaX = soldado.direcao === 1 ? soldado.x + soldado.largura - 2 : soldado.x - 14;
+      const armaY = soldado.y + (soldado.agachado ? 11 : 19);
+      ctx.fillRect(armaX, armaY, 16, 6);
+    }
+  }
+
+  // Inimigos
+  for (let i = 0; i < estadoJogo.inimigos.length; i++) {
+    const inimigo = estadoJogo.inimigos[i];
+    ctx.fillStyle = inimigo.cor;
+    ctx.fillRect(inimigo.x, inimigo.y, inimigo.largura, inimigo.altura);
+  }
+
+  // Boss (Nível 5)
+  if (estadoJogo.boss) {
+    const boss = estadoJogo.boss;
+    ctx.fillStyle = "#e03131";
+    ctx.fillRect(boss.x, boss.y, boss.largura, boss.altura);
+
+    // Canhão do Boss
+    ctx.fillStyle = "#212529";
+    ctx.fillRect(boss.x - 16, boss.y + 34, 20, 12);
+    ctx.fillRect(boss.x - 16, boss.y + boss.altura - 26, 20, 12);
+  }
+
+  // Tiros do jogador
+  ctx.fillStyle = "#ffe066";
+  for (let i = 0; i < estadoJogo.tirosJogador.length; i++) {
+    const t = estadoJogo.tirosJogador[i];
+    ctx.fillRect(t.x, t.y, t.largura, t.altura);
+  }
+
+  // Tiros dos inimigos
+  ctx.fillStyle = "#ff6b6b";
+  for (let i = 0; i < estadoJogo.tirosInimigos.length; i++) {
+    const t = estadoJogo.tirosInimigos[i];
+    ctx.fillRect(t.x, t.y, t.largura, t.altura);
+  }
+
+  ctx.restore();
+
+  // Barra de vida do Boss no topo do canvas
+  if (estadoJogo.boss) {
+    const boss = estadoJogo.boss;
+    const larguraBarra = 360;
+    const xBarra = (canvas.width - larguraBarra) / 2;
+    ctx.fillStyle = "#212529";
+    ctx.fillRect(xBarra, 18, larguraBarra, 16);
+    ctx.fillStyle = "#fa5252";
+    ctx.fillRect(xBarra, 18, larguraBarra * (boss.vida / boss.vidaMaxima), 16);
+    ctx.strokeStyle = "#ffffff";
+    ctx.strokeRect(xBarra, 18, larguraBarra, 16);
+  }
+
+  // Banner rápido ao entrar em um novo nível
+  if (estadoJogo.avisoNivelFrames > 0) {
+    estadoJogo.avisoNivelFrames--;
+    ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+    ctx.fillRect(canvas.width / 2 - 190, 60, 380, 44);
+    ctx.fillStyle = "#f0b429";
+    ctx.font = "bold 18px Segoe UI, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(configNivel.nome, canvas.width / 2, 88);
+    ctx.textAlign = "start";
+  }
+}
+
+// =========================================================
+// 10. LOOP PRINCIPAL
+// =========================================================
+function loopPrincipal() {
+  if (estadoJogo.status === "jogando") {
+    estadoJogo.frameAtual++;
+    atualizarSoldado();
+    gerarInimigos();
+    atualizarInimigos();
+    atualizarBoss();
+    atualizarProjeteis();
+    atualizarHUD();
+  }
+
+  desenharCena();
+  requestAnimationFrame(loopPrincipal);
+}
+
+// Inicialização ao carregar o script
+registrarEventos();
+desenharCena();
+loopPrincipal();
