@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operação Vanguarda - Jogo 2D</title>
+  <link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+  <header class="cabecalho">
+    <h1>Operação Vanguarda</h1>
+    <p class="subtitulo">Avance pelos 5 setores, elimine as criaturas e derrote o Comandante Bélico!</p>
+  </header>
+
+  <main class="container-principal">
+    <!-- Painel superior de status (atualizado via DOM) -->
+    <section class="hud" aria-label="Status da partida">
+      <div class="hud-item">
+        <span class="hud-rotulo">Nível:</span>
+        <strong id="hud-nivel">1 / 5</strong>
+      </div>
+      <div class="hud-item">
+        <span class="hud-rotulo">Vida:</span>
+        <strong id="hud-vida">100</strong>
+      </div>
+      <div class="hud-item">
+        <span class="hud-rotulo">Pontos:</span>
+        <strong id="hud-pontos">0</strong>
+      </div>
+      <div class="hud-item">
+        <span class="hud-rotulo">Progresso:</span>
+        <strong id="hud-progresso">0%</strong>
+      </div>
+    </section>
+
+    <!-- Área do jogo -->
+    <div class="palco-wrapper">
+      <canvas id="tela-jogo" width="900" height="440"></canvas>
+
+      <!-- Tela inicial sobreposta -->
+      <div id="overlay-inicio" class="overlay">
+        <h2>Pronto para a Missão?</h2>
+        <p>Atravesse os 4 primeiros setores derrotando inimigos que evoluem a cada fase e enfrente o Boss no Nível 5.</p>
+        <button id="btn-iniciar" type="button" class="btn-primario">Iniciar Missão</button>
+      </div>
+
+      <!-- Tela de fim de partida (Vitória ou Derrota) -->
+      <div id="overlay-fim" class="overlay oculto">
+        <h2 id="titulo-fim">Fim de Jogo</h2>
+        <p id="mensagem-fim">Você foi derrotado em combate.</p>
+        <p class="placar-final">Pontuação Final: <strong id="pontuacao-final">0</strong></p>
+        <button id="btn-reiniciar" type="button" class="btn-primario">Jogar Novamente</button>
+      </div>
+    </div>
+
+    <!-- Instruções visíveis na tela -->
+    <section class="instrucoes">
+      <h2>Como Jogar</h2>
+      <ul class="lista-controles">
+        <li><strong>A / D</strong> ou <strong>← / →</strong>: Andar para trás e para frente</li>
+        <li><strong>W</strong> ou <strong>↑</strong> (segurar): Mirar para cima</li>
+        <li><strong>S</strong> ou <strong>↓</strong> (segurar): Agachar (desvia de tiros altos)</li>
+        <li><strong>Espaço</strong>: Pular sobre obstáculos e plataformas</li>
+        <li><strong>J</strong> ou <strong>Z</strong>: Atirar (para frente ou para cima)</li>
+        <li><strong>R</strong>: Reiniciar partida a qualquer momento</li>
+      </ul>
+    </section>
+  </main>
+
+  <script src="js/jogo.js"></script>
+</body>
+</html>
