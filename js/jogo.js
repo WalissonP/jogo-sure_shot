@@ -86,12 +86,14 @@ const estadoJogo = {
   ultimoTiroFrame: 0,
   invulneravelAte: 0,
   danoSoldadoFrames: 0,
-  recuoSoldadoX: 0,
+  pulsoTelaDano: 0,
+  inclinacaoDano: 0,
   avisoNivelFrames: 0,
   plataformas: [],
   obstaculos: [],
   itensChao: [],
   inimigos: [],
+  particulasDano: [],
   tirosJogador: [],
   tirosInimigos: [],
   boss: null
@@ -127,7 +129,9 @@ function iniciarPartida() {
   estadoJogo.ultimoTiroFrame = 0;
   estadoJogo.invulneravelAte = 0;
   estadoJogo.danoSoldadoFrames = 0;
-  estadoJogo.recuoSoldadoX = 0;
+  estadoJogo.pulsoTelaDano = 0;
+  estadoJogo.inclinacaoDano = 0;
+  estadoJogo.particulasDano = [];
 
   soldado.vida = soldado.vidaMaxima;
   soldado.direcao = 1;
@@ -146,11 +150,13 @@ function carregarNivel(indice) {
   estadoJogo.inimigos = [];
   estadoJogo.obstaculos = [];
   estadoJogo.itensChao = [];
+  estadoJogo.particulasDano = [];
   estadoJogo.tirosJogador = [];
   estadoJogo.tirosInimigos = [];
   estadoJogo.boss = null;
   estadoJogo.danoSoldadoFrames = 0;
-  estadoJogo.recuoSoldadoX = 0;
+  estadoJogo.pulsoTelaDano = 0;
+  estadoJogo.inclinacaoDano = 0;
   estadoJogo.avisoNivelFrames = 140;
 
   soldado.x = 100;
@@ -336,11 +342,6 @@ function registrarEventos() {
 // 6. LÓGICA DO SOLDADO, ITENS DO CHÃO E DISPAROS
 // =========================================================
 function atualizarSoldado() {
-  if (estadoJogo.danoSoldadoFrames > 0) {
-    estadoJogo.danoSoldadoFrames--;
-  }
-  estadoJogo.recuoSoldadoX *= 0.78;
-
   const esquerda = teclas["KeyA"] || teclas["ArrowLeft"];
   const direita = teclas["KeyD"] || teclas["ArrowRight"];
   const cima = teclas["KeyW"] || teclas["ArrowUp"];
@@ -364,15 +365,22 @@ function atualizarSoldado() {
 
   soldado.olhandoCima = Boolean(cima && !soldado.agachado);
 
+  const emRecuoDano = estadoJogo.danoSoldadoFrames > 8;
   const fatorVelocidade = soldado.agachado ? 0.45 : 1;
-  if (esquerda && !direita) {
-    soldado.vx = -soldado.velocidade * fatorVelocidade;
-    soldado.direcao = -1;
-  } else if (direita && !esquerda) {
-    soldado.vx = soldado.velocidade * fatorVelocidade;
-    soldado.direcao = 1;
-  } else {
-    soldado.vx = 0;
+
+  if (!emRecuoDano) {
+    if (esquerda && !direita) {
+      soldado.vx = -soldado.velocidade * fatorVelocidade;
+      soldado.direcao = -1;
+    } else if (direita && !esquerda) {
+      soldado.vx = soldado.velocidade * fatorVelocidade;
+      soldado.direcao = 1;
+    } else {
+      soldado.vx *= 0.6;
+      if (Math.abs(soldado.vx) < 0.15) {
+        soldado.vx = 0;
+      }
+    }
   }
 
   if (pular && soldado.noChao) {
@@ -623,7 +631,6 @@ function atualizarInimigos() {
         inimigo.direcaoOlhar = distanciaX >= 0 ? 1 : -1;
       }
 
-      // Ondulação lenta e controlada para dar margem de reação ao jogador
       const frequencia = inimigo.estado === "atacando" ? 0.16 : 0.1;
       const amplitude = inimigo.estado === "atacando" ? 2.5 : 1.5;
       const onda = Math.sin(estadoJogo.frameAtual * frequencia + inimigo.faseCobra);
@@ -702,7 +709,7 @@ function atualizarBoss() {
 }
 
 // =========================================================
-// 8. PROJÉTEIS E COLISÕES
+// 8. PROJÉTEIS, PARTÍCULAS DE DANO E COLISÕES
 // =========================================================
 function atualizarProjeteis() {
   for (let i = estadoJogo.tirosJogador.length - 1; i >= 0; i--) {
@@ -792,13 +799,59 @@ function atualizarProjeteis() {
   }
 }
 
+function atualizarParticulasDano() {
+  if (estadoJogo.danoSoldadoFrames > 0) {
+    estadoJogo.danoSoldadoFrames--;
+  }
+  if (estadoJogo.pulsoTelaDano > 0) {
+    estadoJogo.pulsoTelaDano--;
+  }
+  estadoJogo.inclinacaoDano *= 0.82;
+
+  for (let i = estadoJogo.particulasDano.length - 1; i >= 0; i--) {
+    const p = estadoJogo.particulasDano[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.25;
+    p.vida--;
+
+    if (p.vida <= 0) {
+      estadoJogo.particulasDano.splice(i, 1);
+    }
+  }
+}
+
 function aplicarDanoSoldado(dano, direcaoImpacto = -1) {
   if (estadoJogo.frameAtual < estadoJogo.invulneravelAte) return;
 
   soldado.vida = Math.max(0, soldado.vida - dano);
   estadoJogo.invulneravelAte = estadoJogo.frameAtual + 45;
-  estadoJogo.danoSoldadoFrames = 14;
-  estadoJogo.recuoSoldadoX = direcaoImpacto * 8;
+  estadoJogo.danoSoldadoFrames = 16;
+  estadoJogo.pulsoTelaDano = 12;
+
+  const dir = direcaoImpacto >= 0 ? 1 : -1;
+  soldado.vx = dir * 4.2;
+  if (soldado.noChao) {
+    soldado.vy = -4.5;
+    soldado.noChao = false;
+  }
+  estadoJogo.inclinacaoDano = -dir * soldado.direcao * 0.28;
+
+  const origemX = soldado.x + soldado.largura / 2;
+  const origemY = soldado.y + soldado.alturaAtual * 0.45;
+  for (let i = 0; i < 10; i++) {
+    const angulo = (Math.random() - 0.5) * Math.PI * 1.2 + (dir < 0 ? Math.PI : 0);
+    const velocidade = 1.8 + Math.random() * 3.8;
+    estadoJogo.particulasDano.push({
+      x: origemX,
+      y: origemY,
+      vx: Math.cos(angulo) * velocidade,
+      vy: Math.sin(angulo) * velocidade - 1.5,
+      vida: 14 + Math.floor(Math.random() * 10),
+      tamanho: 2 + Math.random() * 2.5,
+      cor: i % 2 === 0 ? "#ff922b" : "#ffe066"
+    });
+  }
 
   if (soldado.vida <= 0) {
     atualizarHUD();
@@ -1054,8 +1107,7 @@ function desenharInimigoPadrao(inimigo) {
 
 function desenharSoldado() {
   const emDano = estadoJogo.danoSoldadoFrames > 0;
-  const tremorDano = emDano ? Math.sin(estadoJogo.frameAtual * 1.5) * 3 : 0;
-  const centroX = soldado.x + soldado.largura / 2 + estadoJogo.recuoSoldadoX + tremorDano;
+  const centroX = soldado.x + soldado.largura / 2;
   const baseY = soldado.y + soldado.alturaAtual;
   const andando = Math.abs(soldado.vx) > 0.1 && soldado.noChao;
   const paradoNoChao = !andando && soldado.noChao;
@@ -1067,28 +1119,32 @@ function desenharSoldado() {
   ctx.translate(centroX, baseY);
   ctx.scale(soldado.direcao, 1);
 
+  if (emDano) {
+    ctx.rotate(estadoJogo.inclinacaoDano);
+  }
+
   if (soldado.agachado) {
     const respiracaoAgachadoY = paradoNoChao ? cicloRespiracao * 0.9 : 0;
     const expansaoAgachado = paradoNoChao ? Math.max(0, cicloRespiracao) * 0.7 : 0;
 
-    ctx.fillStyle = emDano ? "#ff8787" : "#2b3a2e";
+    ctx.fillStyle = "#2b3a2e";
     ctx.fillRect(-12, -10, 16, 7);
     ctx.fillStyle = "#1a1d20";
     ctx.fillRect(-15, -7, 8, 7);
 
-    ctx.fillStyle = emDano ? "#ffa8a8" : "#3b4f3f";
+    ctx.fillStyle = "#3b4f3f";
     ctx.fillRect(-2, -14, 12, 9);
     ctx.fillStyle = "#1a1d20";
     ctx.fillRect(4, -7, 10, 7);
 
-    ctx.fillStyle = emDano ? "#ff6b6b" : "#4a634e";
+    ctx.fillStyle = "#4a634e";
     ctx.fillRect(
       -9,
       -26 + respiracaoAgachadoY - expansaoAgachado * 0.4,
       18 + expansaoAgachado,
       15 + expansaoAgachado * 0.4
     );
-    ctx.fillStyle = emDano ? "#fa5252" : "#2d3b30";
+    ctx.fillStyle = "#2d3b30";
     ctx.fillRect(
       -5,
       -24 + respiracaoAgachadoY - expansaoAgachado * 0.4,
@@ -1096,9 +1152,9 @@ function desenharSoldado() {
       11 + expansaoAgachado * 0.4
     );
 
-    ctx.fillStyle = emDano ? "#ffe3e3" : "#d9a077";
+    ctx.fillStyle = "#d9a077";
     ctx.fillRect(-4, -34 + respiracaoAgachadoY, 10, 8);
-    ctx.fillStyle = emDano ? "#ff8787" : "#2f4233";
+    ctx.fillStyle = "#2f4233";
     ctx.beginPath();
     ctx.arc(1, -33 + respiracaoAgachadoY, 7, Math.PI, 0);
     ctx.fill();
@@ -1116,42 +1172,42 @@ function desenharSoldado() {
       ? Math.abs(cicloPasso) * 1.5
       : deslocamentoRespiracaoY;
 
-    ctx.fillStyle = emDano ? "#ff8787" : "#2b3a2e";
+    ctx.fillStyle = "#2b3a2e";
     ctx.fillRect(-5 - deslocamentoPerna, -22 + elevacaoPulo, 8, 16);
     ctx.fillStyle = "#1a1d20";
     ctx.fillRect(-5 - deslocamentoPerna, -7 + elevacaoPulo, 10, 7);
 
-    ctx.fillStyle = emDano ? "#ffa8a8" : "#3b4f3f";
+    ctx.fillStyle = "#3b4f3f";
     ctx.fillRect(-3 + deslocamentoPerna, -22, 8, 16);
     ctx.fillStyle = "#1a1d20";
     ctx.fillRect(-3 + deslocamentoPerna, -7, 11, 7);
 
-    ctx.fillStyle = emDano ? "#ff6b6b" : "#263329";
+    ctx.fillStyle = "#263329";
     ctx.fillRect(-13, -42 + balancoTronco, 6, 17);
 
-    ctx.fillStyle = emDano ? "#ff6b6b" : "#4a634e";
+    ctx.fillStyle = "#4a634e";
     ctx.fillRect(
       -8,
       -44 + balancoTronco - expansaoPeito * 0.5,
       16 + expansaoPeito,
       23 + expansaoPeito * 0.5
     );
-    ctx.fillStyle = emDano ? "#fa5252" : "#2d3b30";
+    ctx.fillStyle = "#2d3b30";
     ctx.fillRect(
       -6,
       -42 + balancoTronco - expansaoPeito * 0.5,
       13 + expansaoPeito,
       17 + expansaoPeito * 0.5
     );
-    ctx.fillStyle = emDano ? "#ffc9c9" : "#5c7a62";
+    ctx.fillStyle = "#5c7a62";
     ctx.fillRect(-4, -33 + balancoTronco, 4, 6);
     ctx.fillRect(1, -33 + balancoTronco, 4, 6);
 
-    ctx.fillStyle = emDano ? "#ffe3e3" : "#d9a077";
+    ctx.fillStyle = "#d9a077";
     ctx.fillRect(-3, -47 + balancoTronco, 6, 4);
     ctx.fillRect(-5, -56 + balancoTronco, 11, 10);
 
-    ctx.fillStyle = emDano ? "#ff8787" : "#2f4233";
+    ctx.fillStyle = "#2f4233";
     ctx.beginPath();
     ctx.arc(0, -54 + balancoTronco, 7.5, Math.PI, 0);
     ctx.fill();
@@ -1243,16 +1299,13 @@ function desenharCena() {
     desenharSoldado();
   }
 
-  // Flash vermelho sutil sobre o soldado no instante do impacto
-  if (estadoJogo.danoSoldadoFrames > 0) {
-    ctx.fillStyle = "rgba(255, 59, 48, 0.28)";
-    ctx.fillRect(
-      soldado.x + estadoJogo.recuoSoldadoX - 4,
-      soldado.y - 4,
-      soldado.largura + 8,
-      soldado.alturaAtual + 8
-    );
+  for (let i = 0; i < estadoJogo.particulasDano.length; i++) {
+    const p = estadoJogo.particulasDano[i];
+    ctx.globalAlpha = Math.max(0, p.vida / 24);
+    ctx.fillStyle = p.cor;
+    ctx.fillRect(p.x, p.y, p.tamanho, p.tamanho);
   }
+  ctx.globalAlpha = 1;
 
   for (let i = 0; i < estadoJogo.inimigos.length; i++) {
     const inimigo = estadoJogo.inimigos[i];
@@ -1290,6 +1343,13 @@ function desenharCena() {
 
   ctx.restore();
 
+  if (estadoJogo.pulsoTelaDano > 0) {
+    const alfa = (estadoJogo.pulsoTelaDano / 12) * 0.28;
+    ctx.strokeStyle = `rgba(224, 49, 49, ${alfa})`;
+    ctx.lineWidth = 14;
+    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+  }
+
   if (estadoJogo.boss) {
     const boss = estadoJogo.boss;
     const larguraBarra = 360;
@@ -1325,6 +1385,7 @@ function loopPrincipal() {
     atualizarInimigos();
     atualizarBoss();
     atualizarProjeteis();
+    atualizarParticulasDano();
     atualizarHUD();
   }
 
