@@ -273,7 +273,7 @@ function atualizarSoldado() {
   }
 
   // Pulo
-  if (pular && soldado.noChao && !soldado.agachado) {
+  if (pular && soldado.noChao) { {
     soldado.vy = soldado.forcaPulo;
     soldado.noChao = false;
   }
@@ -679,7 +679,7 @@ function desenharCena() {
   const centroX = soldado.x + soldado.largura / 2;
   const baseY = soldado.y + soldado.alturaAtual;
   const andando = Math.abs(soldado.vx) > 0.1 && soldado.noChao;
-  const paradoNoChao = !andando && soldado.noChao && !soldado.agachado;
+  const paradoNoChao = !andando && soldado.noChao;
   const cicloPasso = andando ? Math.sin(estadoJogo.frameAtual * 0.35) : 0;
   const cicloRespiracao = paradoNoChao ? Math.sin(estadoJogo.frameAtual * 0.08) : 0;
   const atirouAgora = estadoJogo.frameAtual - estadoJogo.ultimoTiroFrame <= 3;
@@ -690,7 +690,12 @@ function desenharCena() {
   ctx.scale(soldado.direcao, 1);
 
   if (soldado.agachado) {
-    // --- POSE AGACHADO ---
+    // --- POSE AGACHADO (COM RESPIRAÇÃO SUTIL QUANDO PARADO) ---
+    const respiracaoAgachadoY =
+      paradoNoChao && soldado.noChao ? cicloRespiracao * 0.9 : 0;
+    const expansaoAgachado =
+      paradoNoChao && soldado.noChao ? Math.max(0, cicloRespiracao) * 0.7 : 0;
+
     // Perna traseira dobrada no chão
     ctx.fillStyle = "#2b3a2e";
     ctx.fillRect(-12, -10, 16, 7);
@@ -705,23 +710,33 @@ function desenharCena() {
 
     // Tronco e colete tático
     ctx.fillStyle = "#4a634e";
-    ctx.fillRect(-9, -26, 18, 15);
+    ctx.fillRect(
+      -9,
+      -26 + respiracaoAgachadoY - expansaoAgachado * 0.4,
+      18 + expansaoAgachado,
+      15 + expansaoAgachado * 0.4
+    );
     ctx.fillStyle = "#2d3b30"; // Placa do colete
-    ctx.fillRect(-5, -24, 12, 11);
+    ctx.fillRect(
+      -5,
+      -24 + respiracaoAgachadoY - expansaoAgachado * 0.4,
+      12 + expansaoAgachado,
+      11 + expansaoAgachado * 0.4
+    );
 
     // Cabeça e capacete
     ctx.fillStyle = "#d9a077"; // Rosto
-    ctx.fillRect(-4, -34, 10, 8);
+    ctx.fillRect(-4, -34 + respiracaoAgachadoY, 10, 8);
     ctx.fillStyle = "#2f4233"; // Capacete
     ctx.beginPath();
-    ctx.arc(1, -33, 7, Math.PI, 0);
+    ctx.arc(1, -33 + respiracaoAgachadoY, 7, Math.PI, 0);
     ctx.fill();
-    ctx.fillRect(-6, -34, 14, 3);
+    ctx.fillRect(-6, -34 + respiracaoAgachadoY, 14, 3);
     ctx.fillStyle = "#38bdf8"; // Óculos tático
-    ctx.fillRect(2, -31, 6, 3);
+    ctx.fillRect(2, -31 + respiracaoAgachadoY, 6, 3);
 
     // Fuzil na posição baixa
-    desenharFuzil(2, -18, 0, atirouAgora);
+    desenharFuzil(2, -18 + respiracaoAgachadoY, 0, atirouAgora);
   } else {
     // --- POSE EM PÉ / RESPIRANDO / CORRENDO / PULANDO ---
     const deslocamentoPerna = soldado.noChao ? cicloPasso * 7 : 5;
@@ -762,7 +777,7 @@ function desenharCena() {
     ctx.fillRect(
       -6,
       -42 + balancoTronco - expansaoPeito * 0.5,
-      13 + expansaoPeito,
+      13 + expansaoAgachado ?? 13 + expansaoPeito,
       17 + expansaoPeito * 0.5
     );
     ctx.fillStyle = "#5c7a62"; // Bolsos do colete
