@@ -23,6 +23,7 @@ const btnReiniciar = document.querySelector("#btn-reiniciar");
 // =========================================================
 const CHAO_Y = 380;
 const GRAVIDADE = 0.65;
+const FPS_ESTIMADO = 60;
 
 const NIVEIS = [
   {
@@ -90,6 +91,7 @@ const estadoJogo = {
   inclinacaoDano: 0,
   avisoNivelFrames: 0,
   plataformas: [],
+  estruturasQuebradas: [],
   obstaculos: [],
   itensChao: [],
   inimigos: [],
@@ -154,6 +156,7 @@ function carregarNivel(indice) {
   estadoJogo.cameraX = 0;
   estadoJogo.inimigos = [];
   estadoJogo.obstaculos = [];
+  estadoJogo.estruturasQuebradas = [];
   estadoJogo.itensChao = [];
   estadoJogo.particulasDano = [];
   estadoJogo.tirosJogador = [];
@@ -179,34 +182,7 @@ function carregarNivel(indice) {
 
   estadoJogo.plataformas = [];
   if (configNivel.numero === 1) {
-    for (let posX = 430; posX < configNivel.distanciaMeta - 320; posX += 480) {
-      estadoJogo.plataformas.push({
-        x: posX,
-        y: CHAO_Y - 95,
-        largura: 155,
-        altura: 18,
-        tipo: "concreto"
-      });
-      estadoJogo.plataformas.push({
-        x: posX + 225,
-        y: CHAO_Y - 170,
-        largura: 135,
-        altura: 14,
-        tipo: "viga"
-      });
-    }
-
-    for (let obsX = 560; obsX < configNivel.distanciaMeta - 350; obsX += 640) {
-      estadoJogo.obstaculos.push({
-        x: obsX,
-        y: CHAO_Y - 22,
-        largura: 44,
-        altura: 22,
-        tipo: "escombros"
-      });
-    }
-
-    configurarItensChaoFase1(configNivel.distanciaMeta);
+    configurarMapaFase1(configNivel.distanciaMeta);
     posicionarRastejadoresMapa();
   } else if (configNivel.numero < 5) {
     for (let posX = 420; posX < configNivel.distanciaMeta - 300; posX += 460) {
@@ -215,57 +191,81 @@ function carregarNivel(indice) {
         y: CHAO_Y - 95,
         largura: 150,
         altura: 16,
-        tipo: "padrao"
+        tipo: "padrao",
+        desmoronavel: false
       });
       estadoJogo.plataformas.push({
         x: posX + 210,
         y: CHAO_Y - 175,
         largura: 140,
         altura: 16,
-        tipo: "padrao"
+        tipo: "padrao",
+        desmoronavel: false
       });
     }
   } else {
     estadoJogo.plataformas.push(
-      { x: 140, y: CHAO_Y - 105, largura: 160, altura: 16, tipo: "padrao" },
-      { x: 600, y: CHAO_Y - 105, largura: 160, altura: 16, tipo: "padrao" }
+      { x: 140, y: CHAO_Y - 105, largura: 160, altura: 16, tipo: "padrao", desmoronavel: false },
+      { x: 600, y: CHAO_Y - 105, largura: 160, altura: 16, tipo: "padrao", desmoronavel: false }
     );
     criarBoss();
   }
 }
 
-function configurarItensChaoFase1(distanciaMeta) {
-  for (let x = 320; x < distanciaMeta - 260; x += 380) {
-    estadoJogo.itensChao.push({
-      tipo: "caixote",
-      x: x,
-      y: CHAO_Y - 34,
-      largura: 36,
-      altura: 34,
-      vx: 0,
-      destruido: false
+function configurarMapaFase1(distanciaMeta) {
+  // Plataformas ocasionais feitas de pedaços de prédio que desmoronam 2s após pisar
+  const posicoesPlataformas = [470, 1180, 1760];
+  for (let i = 0; i < posicoesPlataformas.length; i++) {
+    const px = posicoesPlataformas[i];
+    estadoJogo.plataformas.push({
+      x: px,
+      y: CHAO_Y - 105,
+      largura: 135,
+      altura: 20,
+      tipo: "predio",
+      desmoronavel: true,
+      pisada: false,
+      tempoRestanteFrames: FPS_ESTIMADO * 2,
+      desmoronando: false,
+      vy: 0,
+      removida: false
     });
+  }
 
-    estadoJogo.itensChao.push({
-      tipo: "barril",
-      x: x + 150,
-      y: CHAO_Y - 38,
-      largura: 28,
-      altura: 38,
-      vida: 1,
-      pontos: 40,
-      destruido: false
+  // Escombros sólidos no chão (rastejadores cavam por baixo deles)
+  const posicoesEscombros = [390, 840, 1460, 1920];
+  for (let i = 0; i < posicoesEscombros.length; i++) {
+    const obsX = posicoesEscombros[i];
+    estadoJogo.obstaculos.push({
+      x: obsX,
+      y: CHAO_Y - 26,
+      largura: 54,
+      altura: 26,
+      tipo: "escombros"
+    });
+  }
+
+  // Prédios quebrados com abertura baixa: só dá pra passar deitado
+  const posicoesPredios = [660, 1580];
+  for (let i = 0; i < posicoesPredios.length; i++) {
+    const bx = posicoesPredios[i];
+    estadoJogo.estruturasQuebradas.push({
+      x: bx,
+      y: CHAO_Y - 135,
+      largura: 110,
+      alturaTotal: 135,
+      alturaPassagem: 34 // Vão livre do chão até a viga baixa (soldado em pé tem 56, deitado tem 20)
     });
   }
 }
 
 function posicionarRastejadoresMapa() {
   const pontosMapa = [
-    { x: 520, alcance: 240, velocidadeAtaque: 1.35 },
-    { x: 900, alcance: 255, velocidadeAtaque: 1.45 },
-    { x: 1280, alcance: 265, velocidadeAtaque: 1.55 },
-    { x: 1650, alcance: 255, velocidadeAtaque: 1.65 },
-    { x: 1950, alcance: 245, velocidadeAtaque: 1.75 }
+    { x: 520, alcance: 245, velocidadeAtaque: 1.35 },
+    { x: 960, alcance: 260, velocidadeAtaque: 1.45 },
+    { x: 1340, alcance: 265, velocidadeAtaque: 1.55 },
+    { x: 1690, alcance: 255, velocidadeAtaque: 1.65 },
+    { x: 2020, alcance: 250, velocidadeAtaque: 1.75 }
   ];
 
   for (let i = 0; i < pontosMapa.length; i++) {
@@ -285,13 +285,13 @@ function criarRastejador(x, alcance = 250, velocidadeAtaque = 1.5, indice = 0) {
     vy: 0,
     vida: 1,
     pontos: 60,
-    estado: "esperando", // "esperando" | "atacando"
+    estado: "esperando", // "esperando" | "atacando" | "cavando"
     alcanceAtaque: alcance,
     velocidadeAtaque: velocidadeAtaque,
     direcaoOlhar: -1,
     faseCobra: indice * 1.1,
     danoFrames: 0,
-    cor: "#52b788"
+    cor: "#9c6644"
   };
 }
 
@@ -347,8 +347,54 @@ function registrarEventos() {
 }
 
 // =========================================================
-// 6. LÓGICA DO SOLDADO, ITENS DO CHÃO E DISPAROS
+// 6. LÓGICA DO SOLDADO, PLATAFORMAS, ESTRUTURAS E DISPAROS
 // =========================================================
+function atualizarPlataformas() {
+  for (let i = estadoJogo.plataformas.length - 1; i >= 0; i--) {
+    const plat = estadoJogo.plataformas[i];
+    if (!plat.desmoronavel) continue;
+
+    if (plat.pisada && !plat.desmoronando) {
+      plat.tempoRestanteFrames--;
+      if (plat.tempoRestanteFrames <= 0) {
+        plat.desmoronando = true;
+        plat.vy = 1.5;
+
+        for (let p = 0; p < 8; p++) {
+          estadoJogo.particulasDano.push({
+            x: plat.x + Math.random() * plat.largura,
+            y: plat.y + plat.altura,
+            vx: (Math.random() - 0.5) * 2.5,
+            vy: Math.random() * 1.5,
+            vida: 18 + Math.floor(Math.random() * 10),
+            tamanho: 3 + Math.random() * 3,
+            cor: "#8c8275"
+          });
+        }
+      }
+    }
+
+    if (plat.desmoronando) {
+      plat.vy += GRAVIDADE * 0.7;
+      plat.y += plat.vy;
+      if (plat.y > canvas.height + 60) {
+        estadoJogo.plataformas.splice(i, 1);
+      }
+    }
+  }
+}
+
+function obterBlocoPassagemBaixa(estrutura) {
+  // Bloco superior que deixa apenas `alturaPassagem` livre rente ao chão
+  const alturaBlocoSuperior = Math.max(20, estrutura.alturaTotal - estrutura.alturaPassagem);
+  return {
+    x: estrutura.x + 12,
+    y: estrutura.y,
+    largura: estrutura.largura - 24,
+    altura: alturaBlocoSuperior
+  };
+}
+
 function atualizarSoldado() {
   const esquerda = teclas["KeyA"] || teclas["ArrowLeft"];
   const direita = teclas["KeyD"] || teclas["ArrowRight"];
@@ -359,6 +405,28 @@ function atualizarSoldado() {
 
   const querDeitar = Boolean(baixo && soldado.noChao);
 
+  // Impede levantar se houver um teto baixo de prédio quebrado logo acima da cabeça
+  let bloqueadoParaLevantar = false;
+  if (!querDeitar && soldado.deitado) {
+    const xCentro = soldado.x + soldado.largura / 2;
+    const xEmPe = xCentro - soldado.larguraEmPe / 2;
+    const yEmPe = soldado.y + soldado.alturaDeitado - soldado.alturaEmPe;
+    const caixaEmPe = {
+      x: xEmPe,
+      y: yEmPe,
+      largura: soldado.larguraEmPe,
+      altura: soldado.alturaEmPe
+    };
+
+    for (let i = 0; i < estadoJogo.estruturasQuebradas.length; i++) {
+      const blocoAlto = obterBlocoPassagemBaixa(estadoJogo.estruturasQuebradas[i]);
+      if (colidiu(caixaEmPe, blocoAlto)) {
+        bloqueadoParaLevantar = true;
+        break;
+      }
+    }
+  }
+
   if (querDeitar && !soldado.deitado) {
     const centroXAntigo = soldado.x + soldado.largura / 2;
     soldado.y += soldado.alturaEmPe - soldado.alturaDeitado;
@@ -366,7 +434,7 @@ function atualizarSoldado() {
     soldado.largura = soldado.larguraDeitado;
     soldado.alturaAtual = soldado.alturaDeitado;
     soldado.x = centroXAntigo - soldado.largura / 2;
-  } else if (!querDeitar && soldado.deitado) {
+  } else if (!querDeitar && !bloqueadoParaLevantar && soldado.deitado) {
     const centroXAntigo = soldado.x + soldado.largura / 2;
     soldado.y -= soldado.alturaEmPe - soldado.alturaDeitado;
     soldado.deitado = false;
@@ -403,6 +471,28 @@ function atualizarSoldado() {
   const xAnterior = soldado.x;
   const yAnterior = soldado.y;
   soldado.x += soldado.vx;
+
+  // Colisão horizontal contra o vão superior do prédio quebrado (só passa deitado)
+  for (let i = 0; i < estadoJogo.estruturasQuebradas.length; i++) {
+    const blocoAlto = obterBlocoPassagemBaixa(estadoJogo.estruturasQuebradas[i]);
+    const caixaAtual = {
+      x: soldado.x,
+      y: soldado.y,
+      largura: soldado.largura,
+      altura: soldado.alturaAtual
+    };
+
+    if (colidiu(caixaAtual, blocoAlto)) {
+      if (xAnterior + soldado.largura <= blocoAlto.x + 4) {
+        soldado.x = blocoAlto.x - soldado.largura;
+        soldado.vx = 0;
+      } else if (xAnterior >= blocoAlto.x + blocoAlto.largura - 4) {
+        soldado.x = blocoAlto.x + blocoAlto.largura;
+        soldado.vx = 0;
+      }
+    }
+  }
+
   soldado.vy += GRAVIDADE;
   soldado.y += soldado.vy;
 
@@ -417,15 +507,21 @@ function atualizarSoldado() {
   soldado.noChao = false;
   for (let i = 0; i < estadoJogo.plataformas.length; i++) {
     const plat = estadoJogo.plataformas[i];
+    if (plat.desmoronando) continue;
+
     const dentroX = soldado.x + soldado.largura > plat.x && soldado.x < plat.x + plat.largura;
     const cruzouTopo =
-      yAnterior + soldado.alturaAtual <= plat.y &&
+      yAnterior + soldado.alturaAtual <= plat.y + 4 &&
       soldado.y + soldado.alturaAtual >= plat.y;
 
     if (soldado.vy >= 0 && dentroX && cruzouTopo) {
       soldado.y = plat.y - soldado.alturaAtual;
       soldado.vy = 0;
       soldado.noChao = true;
+
+      if (plat.desmoronavel && !plat.pisada) {
+        plat.pisada = true;
+      }
     }
   }
 
@@ -433,7 +529,7 @@ function atualizarSoldado() {
     const obs = estadoJogo.obstaculos[i];
     const dentroX = soldado.x + soldado.largura > obs.x && soldado.x < obs.x + obs.largura;
     const cruzouTopo =
-      yAnterior + soldado.alturaAtual <= obs.y &&
+      yAnterior + soldado.alturaAtual <= obs.y + 4 &&
       soldado.y + soldado.alturaAtual >= obs.y;
 
     if (soldado.vy >= 0 && dentroX && cruzouTopo) {
@@ -443,41 +539,19 @@ function atualizarSoldado() {
     }
   }
 
-  for (let i = 0; i < estadoJogo.itensChao.length; i++) {
-    const item = estadoJogo.itensChao[i];
-    if (item.destruido) continue;
-
-    const dentroX = soldado.x + soldado.largura > item.x && soldado.x < item.x + item.largura;
+  for (let i = 0; i < estadoJogo.estruturasQuebradas.length; i++) {
+    const blocoAlto = obterBlocoPassagemBaixa(estadoJogo.estruturasQuebradas[i]);
+    const dentroX =
+      soldado.x + soldado.largura > blocoAlto.x &&
+      soldado.x < blocoAlto.x + blocoAlto.largura;
     const cruzouTopo =
-      yAnterior + soldado.alturaAtual <= item.y &&
-      soldado.y + soldado.alturaAtual >= item.y;
+      yAnterior + soldado.alturaAtual <= blocoAlto.y + 4 &&
+      soldado.y + soldado.alturaAtual >= blocoAlto.y;
 
     if (soldado.vy >= 0 && dentroX && cruzouTopo) {
-      soldado.y = item.y - soldado.alturaAtual;
+      soldado.y = blocoAlto.y - soldado.alturaAtual;
       soldado.vy = 0;
       soldado.noChao = true;
-      continue;
-    }
-
-    const sobrepoeY =
-      soldado.y + soldado.alturaAtual > item.y + 4 &&
-      soldado.y < item.y + item.altura;
-
-    if (dentroX && sobrepoeY) {
-      if (item.tipo === "caixote") {
-        if (soldado.x >= xAnterior) {
-          item.x += soldado.vx * 0.7;
-        } else {
-          item.x += soldado.vx * 0.7;
-        }
-        item.x = Math.max(estadoJogo.cameraX, Math.min(configNivel.distanciaMeta - item.largura, item.x));
-      } else if (item.tipo === "barril") {
-        if (soldado.x + soldado.largura / 2 < item.x + item.largura / 2) {
-          soldado.x = item.x - soldado.largura;
-        } else {
-          soldado.x = item.x + item.largura;
-        }
-      }
     }
   }
 
@@ -628,6 +702,23 @@ function gerarInimigos() {
   }
 }
 
+function haObstaculoAFrente(inimigo, dir) {
+  const proximoX = dir === 1 ? inimigo.x + inimigo.largura + 6 : inimigo.x - 6;
+  const caixaFrente = {
+    x: proximoX,
+    y: CHAO_Y - 24,
+    largura: 10,
+    altura: 24
+  };
+
+  for (let i = 0; i < estadoJogo.obstaculos.length; i++) {
+    if (colidiu(caixaFrente, estadoJogo.obstaculos[i])) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function atualizarInimigos() {
   const centroSoldadoX = soldado.x + soldado.largura / 2;
 
@@ -646,19 +737,49 @@ function atualizarInimigos() {
         inimigo.estado = "atacando";
       }
 
-      if (inimigo.estado === "atacando") {
+      if (inimigo.estado === "atacando" || inimigo.estado === "cavando") {
         inimigo.direcaoOlhar = distanciaX >= 0 ? 1 : -1;
-        inimigo.vx = inimigo.direcaoOlhar * inimigo.velocidadeAtaque;
+        const obstaculoFrente = haObstaculoAFrente(inimigo, inimigo.direcaoOlhar);
+
+        if (obstaculoFrente) {
+          inimigo.estado = "cavando";
+        } else if (inimigo.estado === "cavando") {
+          inimigo.estado = "atacando";
+        }
+
+        const velAtual =
+          inimigo.estado === "cavando"
+            ? inimigo.velocidadeAtaque * 0.85
+            : inimigo.velocidadeAtaque;
+
+        inimigo.vx = inimigo.direcaoOlhar * velAtual;
         inimigo.x += inimigo.vx;
+
+        if (inimigo.estado === "cavando" && estadoJogo.frameAtual % 6 === 0) {
+          estadoJogo.particulasDano.push({
+            x: inimigo.x + inimigo.largura / 2 + inimigo.direcaoOlhar * 10,
+            y: CHAO_Y,
+            vx: -inimigo.direcaoOlhar * (1 + Math.random() * 2),
+            vy: -2.2 - Math.random() * 2,
+            vida: 12 + Math.floor(Math.random() * 8),
+            tamanho: 2.5 + Math.random() * 2.5,
+            cor: Math.random() < 0.5 ? "#7f5539" : "#b08968"
+          });
+        }
       } else {
         inimigo.vx = 0;
         inimigo.direcaoOlhar = distanciaX >= 0 ? 1 : -1;
       }
 
-      const frequencia = inimigo.estado === "atacando" ? 0.16 : 0.1;
-      const amplitude = inimigo.estado === "atacando" ? 2.5 : 1.5;
-      const onda = Math.sin(estadoJogo.frameAtual * frequencia + inimigo.faseCobra);
-      inimigo.y = CHAO_Y - inimigo.altura - Math.abs(onda) * amplitude;
+      if (inimigo.estado === "cavando") {
+        const ondaCava = Math.sin(estadoJogo.frameAtual * 0.28 + inimigo.faseCobra);
+        inimigo.y = CHAO_Y - inimigo.altura + 8 + ondaCava * 2;
+      } else {
+        const frequencia = inimigo.estado === "atacando" ? 0.16 : 0.1;
+        const amplitude = inimigo.estado === "atacando" ? 2.5 : 1.5;
+        const onda = Math.sin(estadoJogo.frameAtual * frequencia + inimigo.faseCobra);
+        inimigo.y = CHAO_Y - inimigo.altura - Math.abs(onda) * amplitude;
+      }
     } else {
       inimigo.x += inimigo.vx;
     }
@@ -690,7 +811,8 @@ function atualizarInimigos() {
     }
 
     if (colidiu(soldado, inimigo)) {
-      const direcaoImpacto = soldado.x + soldado.largura / 2 < inimigo.x + inimigo.largura / 2 ? -1 : 1;
+      const direcaoImpacto =
+        soldado.x + soldado.largura / 2 < inimigo.x + inimigo.largura / 2 ? -1 : 1;
       aplicarDanoSoldado(15, direcaoImpacto);
     }
 
@@ -727,7 +849,8 @@ function atualizarBoss() {
   }
 
   if (colidiu(soldado, boss)) {
-    const direcaoImpacto = soldado.x + soldado.largura / 2 < boss.x + boss.largura / 2 ? -1 : 1;
+    const direcaoImpacto =
+      soldado.x + soldado.largura / 2 < boss.x + boss.largura / 2 ? -1 : 1;
     aplicarDanoSoldado(20, direcaoImpacto);
   }
 }
@@ -743,33 +866,21 @@ function atualizarProjeteis() {
 
     let acertou = false;
 
-    for (let k = 0; k < estadoJogo.itensChao.length; k++) {
-      const item = estadoJogo.itensChao[k];
-      if (!item.destruido && item.tipo === "barril" && colidiu(tiro, item)) {
-        item.destruido = true;
-        estadoJogo.pontuacao += item.pontos;
-        acertou = true;
-        break;
-      }
-    }
-
-    if (!acertou) {
-      for (let j = estadoJogo.inimigos.length - 1; j >= 0; j--) {
-        const inimigo = estadoJogo.inimigos[j];
-        if (colidiu(tiro, inimigo)) {
-          if (inimigo.tipo === "rastejador" && tiro.nivelTiro !== "baixo") {
-            continue;
-          }
-
-          inimigo.vida -= 1;
-          inimigo.danoFrames = 10;
-          acertou = true;
-          if (inimigo.vida <= 0) {
-            estadoJogo.pontuacao += inimigo.pontos;
-            estadoJogo.inimigos.splice(j, 1);
-          }
-          break;
+    for (let j = estadoJogo.inimigos.length - 1; j >= 0; j--) {
+      const inimigo = estadoJogo.inimigos[j];
+      if (colidiu(tiro, inimigo)) {
+        if (inimigo.tipo === "rastejador" && tiro.nivelTiro !== "baixo") {
+          continue;
         }
+
+        inimigo.vida -= 1;
+        inimigo.danoFrames = 10;
+        acertou = true;
+        if (inimigo.vida <= 0) {
+          estadoJogo.pontuacao += inimigo.pontos;
+          estadoJogo.inimigos.splice(j, 1);
+        }
+        break;
       }
     }
 
@@ -912,6 +1023,47 @@ function atualizarHUD() {
   }
 }
 
+function desenharEstruturasQuebradas() {
+  for (let i = 0; i < estadoJogo.estruturasQuebradas.length; i++) {
+    const est = estadoJogo.estruturasQuebradas[i];
+    const blocoAlto = obterBlocoPassagemBaixa(est);
+
+    // Pilares laterais quebrados
+    ctx.fillStyle = "#48443d";
+    ctx.fillRect(est.x, est.y + 16, 14, est.alturaTotal - 16);
+    ctx.fillRect(est.x + est.largura - 14, est.y + 28, 14, est.alturaTotal - 28);
+
+    // Topo quebrado do prédio
+    ctx.fillStyle = "#36332e";
+    ctx.beginPath();
+    ctx.moveTo(est.x, est.y + 16);
+    ctx.lineTo(est.x + 28, est.y);
+    ctx.lineTo(est.x + 56, est.y + 12);
+    ctx.lineTo(est.x + 84, est.y + 4);
+    ctx.lineTo(est.x + est.largura, est.y + 28);
+    ctx.lineTo(est.x + est.largura, blocoAlto.y + blocoAlto.altura);
+    ctx.lineTo(est.x, blocoAlto.y + blocoAlto.altura);
+    ctx.closePath();
+    ctx.fill();
+
+    // Laje / viga superior que cria o buraco rente ao chão
+    ctx.fillStyle = "#5a544a";
+    ctx.fillRect(blocoAlto.x, blocoAlto.y, blocoAlto.largura, blocoAlto.altura);
+    ctx.fillStyle = "#787064";
+    ctx.fillRect(blocoAlto.x, blocoAlto.y + blocoAlto.altura - 5, blocoAlto.largura, 5);
+
+    // Ferragens expostas na borda inferior do vão
+    ctx.strokeStyle = "#8c4a27";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(blocoAlto.x + 12, blocoAlto.y + blocoAlto.altura);
+    ctx.lineTo(blocoAlto.x + 16, blocoAlto.y + blocoAlto.altura + 5);
+    ctx.moveTo(blocoAlto.x + blocoAlto.largura - 18, blocoAlto.y + blocoAlto.altura);
+    ctx.lineTo(blocoAlto.x + blocoAlto.largura - 14, blocoAlto.y + blocoAlto.altura + 4);
+    ctx.stroke();
+  }
+}
+
 function desenharCenarioPosApocaliptico(configNivel) {
   const gradienteCeu = ctx.createLinearGradient(0, 0, 0, CHAO_Y);
   gradienteCeu.addColorStop(0, "#191d1c");
@@ -976,75 +1128,69 @@ function desenharCenarioPosApocaliptico(configNivel) {
 
   for (let i = 0; i < estadoJogo.obstaculos.length; i++) {
     const obs = estadoJogo.obstaculos[i];
-    ctx.fillStyle = "#4a453d";
+    ctx.fillStyle = "#595247";
     ctx.beginPath();
     ctx.moveTo(obs.x, obs.y + obs.altura);
-    ctx.lineTo(obs.x + 8, obs.y + 6);
-    ctx.lineTo(obs.x + obs.largura * 0.55, obs.y);
-    ctx.lineTo(obs.x + obs.largura, obs.y + 10);
+    ctx.lineTo(obs.x + 8, obs.y + 8);
+    ctx.lineTo(obs.x + obs.largura * 0.52, obs.y);
+    ctx.lineTo(obs.x + obs.largura * 0.82, obs.y + 11);
     ctx.lineTo(obs.x + obs.largura, obs.y + obs.altura);
     ctx.closePath();
     ctx.fill();
 
+    ctx.fillStyle = "#3d3830";
+    ctx.fillRect(obs.x + 12, obs.y + 12, 14, 8);
+
     ctx.strokeStyle = "#8c4a27";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(obs.x + obs.largura * 0.6, obs.y + 4);
-    ctx.lineTo(obs.x + obs.largura * 0.85, obs.y - 10);
+    ctx.moveTo(obs.x + obs.largura * 0.6, obs.y + 5);
+    ctx.lineTo(obs.x + obs.largura * 0.85, obs.y - 9);
     ctx.stroke();
   }
 
   ctx.restore();
 }
 
-function desenharItensChao() {
-  for (let i = 0; i < estadoJogo.itensChao.length; i++) {
-    const item = estadoJogo.itensChao[i];
-    if (item.destruido) continue;
-
-    if (item.tipo === "caixote") {
-      ctx.fillStyle = "#7c5832";
-      ctx.fillRect(item.x, item.y, item.largura, item.altura);
-      ctx.strokeStyle = "#a37846";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(item.x + 2, item.y + 2, item.largura - 4, item.altura - 4);
-      ctx.beginPath();
-      ctx.moveTo(item.x + 4, item.y + 4);
-      ctx.lineTo(item.x + item.largura - 4, item.y + item.altura - 4);
-      ctx.stroke();
-    } else if (item.tipo === "barril") {
-      ctx.fillStyle = "#9e3b24";
-      ctx.fillRect(item.x, item.y, item.largura, item.altura);
-      ctx.fillStyle = "#d99b26";
-      ctx.fillRect(item.x, item.y + 8, item.largura, 4);
-      ctx.fillRect(item.x, item.y + item.altura - 12, item.largura, 4);
-    }
-  }
-}
-
 function desenharPlataformas(configNivel) {
   for (let i = 0; i < estadoJogo.plataformas.length; i++) {
     const plat = estadoJogo.plataformas[i];
 
-    if (configNivel.numero === 1) {
-      if (plat.tipo === "concreto") {
-        ctx.fillStyle = "#5c574f";
-        ctx.fillRect(plat.x, plat.y, plat.largura, plat.altura);
-        ctx.fillStyle = "#7a746a";
-        ctx.fillRect(plat.x, plat.y, plat.largura, 4);
-        ctx.fillStyle = "#3a3630";
-        ctx.fillRect(plat.x + 28, plat.y + 6, 18, 5);
-        ctx.fillRect(plat.x + 96, plat.y + 8, 24, 6);
-      } else {
-        ctx.fillStyle = "#6e4730";
-        ctx.fillRect(plat.x, plat.y, plat.largura, plat.altura);
-        ctx.fillStyle = "#8c5b3e";
-        ctx.fillRect(plat.x, plat.y, plat.largura, 3);
-        ctx.fillStyle = "#3d271a";
-        for (let rx = plat.x + 12; rx < plat.x + plat.largura - 8; rx += 24) {
-          ctx.fillRect(rx, plat.y + 5, 4, 4);
-        }
+    if (plat.desmoronavel) {
+      const tremor =
+        plat.pisada && !plat.desmoronando
+          ? Math.sin(estadoJogo.frameAtual * 1.6) * 2.5
+          : 0;
+      const px = plat.x + tremor;
+
+      ctx.save();
+      if (plat.desmoronando) {
+        ctx.translate(px + plat.largura / 2, plat.y + plat.altura / 2);
+        ctx.rotate(Math.min(0.25, plat.vy * 0.02));
+        ctx.translate(-(px + plat.largura / 2), -(plat.y + plat.altura / 2));
       }
+
+      // Pedaço de laje / prédio quebrado
+      ctx.fillStyle = plat.pisada && !plat.desmoronando ? "#7a6855" : "#615b52";
+      ctx.beginPath();
+      ctx.moveTo(px, plat.y + 3);
+      ctx.lineTo(px + plat.largura * 0.28, plat.y);
+      ctx.lineTo(px + plat.largura * 0.65, plat.y + 4);
+      ctx.lineTo(px + plat.largura, plat.y + 1);
+      ctx.lineTo(px + plat.largura - 4, plat.y + plat.altura);
+      ctx.lineTo(px + 5, plat.y + plat.altura);
+      ctx.closePath();
+      ctx.fill();
+
+      // Detalhe de concreto e rachadura
+      ctx.fillStyle = "#423d36";
+      ctx.fillRect(px + 14, plat.y + 7, 22, 6);
+      ctx.fillRect(px + plat.largura - 36, plat.y + 8, 18, 5);
+
+      ctx.restore();
+    } else if (configNivel.numero === 1) {
+      ctx.fillStyle = "#5c574f";
+      ctx.fillRect(plat.x, plat.y, plat.largura, plat.altura);
     } else {
       ctx.fillStyle = "#6c7a89";
       ctx.fillRect(plat.x, plat.y, plat.largura, plat.altura);
@@ -1053,8 +1199,9 @@ function desenharPlataformas(configNivel) {
 }
 
 function desenharRastejadorAlien(inimigo) {
+  const cavando = inimigo.estado === "cavando";
   const baseY = inimigo.y + inimigo.altura;
-  const freq = inimigo.estado === "atacando" ? 0.18 : 0.12;
+  const freq = cavando ? 0.24 : inimigo.estado === "atacando" ? 0.18 : 0.12;
   const tempo = estadoJogo.frameAtual * freq + inimigo.faseCobra;
   const dir = inimigo.direcaoOlhar || -1;
   const emDano = inimigo.danoFrames > 0;
@@ -1064,6 +1211,13 @@ function desenharRastejadorAlien(inimigo) {
   const centroX = inimigo.x + inimigo.largura / 2 + tremorDano;
   ctx.translate(centroX, baseY);
   ctx.scale(-dir, 1);
+
+  if (cavando) {
+    // Recorta o corpo abaixo da linha do chão para dar efeito de escavação
+    ctx.beginPath();
+    ctx.rect(-50, -50, 100, 50 + (CHAO_Y - baseY));
+    ctx.clip();
+  }
 
   const cabecaX = -14;
   const cabecaY = -12 + Math.sin(tempo) * 2.2;
@@ -1079,13 +1233,17 @@ function desenharRastejadorAlien(inimigo) {
     if (emDano) {
       ctx.fillStyle = s % 2 === 0 ? "#ffffff" : "#ff6b6b";
     } else {
-      ctx.fillStyle = s % 2 === 0 ? "#388e6c" : "#2b6e54";
+      ctx.fillStyle = s % 2 === 0 ? "#9c6644" : "#7f5539";
     }
     ctx.beginPath();
     ctx.arc(segX, segY, raio, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = emDano ? "#ffd43b" : inimigo.estado === "atacando" ? "#ff595e" : "#9ef01a";
+    ctx.fillStyle = emDano
+      ? "#ffd43b"
+      : inimigo.estado === "atacando"
+      ? "#c8553d"
+      : "#ddb892";
     ctx.beginPath();
     ctx.moveTo(segX - 2, segY - raio);
     ctx.lineTo(segX + 1, segY - raio - 4 * (1 - proporcao * 0.4));
@@ -1094,12 +1252,12 @@ function desenharRastejadorAlien(inimigo) {
     ctx.fill();
   }
 
-  ctx.fillStyle = emDano ? "#ffffff" : "#40916c";
+  ctx.fillStyle = emDano ? "#ffffff" : "#b08968";
   ctx.beginPath();
   ctx.ellipse(cabecaX, cabecaY, 11, 8.5, -0.15, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = "#f8f9fa";
+  ctx.fillStyle = "#ede0d4";
   ctx.beginPath();
   ctx.moveTo(cabecaX - 8, cabecaY + 3);
   ctx.lineTo(cabecaX - 12, cabecaY + 8);
@@ -1107,7 +1265,7 @@ function desenharRastejadorAlien(inimigo) {
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = emDano ? "#ff2a55" : inimigo.estado === "atacando" ? "#ff2a55" : "#ffbe0b";
+  ctx.fillStyle = emDano ? "#ff2a55" : inimigo.estado === "atacando" ? "#e03131" : "#e6a15c";
   ctx.beginPath();
   ctx.arc(cabecaX - 2, cabecaY - 3, 3.2, 0, Math.PI * 2);
   ctx.fill();
@@ -1149,13 +1307,11 @@ function desenharSoldado() {
   }
 
   if (soldado.deitado) {
-    // Animação de andar deitado (rastejando rente ao chão)
     const impulsoRastejarX = cicloRastejar * 2.5;
     const elevacaoTroncoY = andando ? Math.abs(cicloRastejar) * -1.8 : cicloRespiracao * 0.5;
     const movimentoPerna = andando ? cicloRastejar * 4 : 0;
     const movimentoCotovelo = andando ? -cicloRastejar * 3 : 0;
 
-    // Pernas e coturnos estendidos atrás, alternando o apoio no chão
     ctx.fillStyle = "#2b3a2e";
     ctx.fillRect(-24 + movimentoPerna * 0.6, -8 + Math.min(0, movimentoPerna * 0.4), 13, 5);
     ctx.fillStyle = "#1a1d20";
@@ -1166,17 +1322,14 @@ function desenharSoldado() {
     ctx.fillStyle = "#1a1d20";
     ctx.fillRect(-24 - movimentoPerna * 0.6, -5 + Math.min(0, -movimentoPerna * 0.4), 5, 5);
 
-    // Mochila tática nas costas
     ctx.fillStyle = "#263329";
     ctx.fillRect(-13 + impulsoRastejarX * 0.5, -15 + elevacaoTroncoY, 7, 8);
 
-    // Tronco deitado horizontalmente
     ctx.fillStyle = "#4a634e";
     ctx.fillRect(-12 + impulsoRastejarX * 0.5, -14 + elevacaoTroncoY, 20, 9);
     ctx.fillStyle = "#2d3b30";
     ctx.fillRect(-10 + impulsoRastejarX * 0.5, -13 + elevacaoTroncoY, 16, 6);
 
-    // Cabeça e capacete voltados para a frente, rente ao solo
     ctx.fillStyle = "#d9a077";
     ctx.fillRect(8 + impulsoRastejarX * 0.4, -12 + elevacaoTroncoY * 0.8, 8, 7);
     ctx.fillStyle = "#2f4233";
@@ -1187,11 +1340,9 @@ function desenharSoldado() {
     ctx.fillStyle = "#38bdf8";
     ctx.fillRect(13 + impulsoRastejarX * 0.4, -10 + elevacaoTroncoY * 0.8, 4, 2.5);
 
-    // Braço de apoio / cotovelo rastejando
     ctx.fillStyle = "#4a634e";
     ctx.fillRect(2 + movimentoCotovelo * 0.5, -6 + Math.min(0, movimentoCotovelo * 0.4), 8, 5);
 
-    // Fuzil apoiado na linha do tiro deitado
     desenharFuzil(11 + impulsoRastejarX * 0.4, -9 + elevacaoTroncoY * 0.6, 0, atirouAgora);
   } else {
     const deslocamentoPerna = soldado.noChao ? cicloPasso * 7 : 5;
@@ -1311,8 +1462,8 @@ function desenharCena() {
     ctx.fillRect(0, CHAO_Y, configNivel.distanciaMeta + 200, 5);
   }
 
+  desenharEstruturasQuebradas();
   desenharPlataformas(configNivel);
-  desenharItensChao();
 
   if (configNivel.numero < 5) {
     ctx.fillStyle = "#f0b429";
@@ -1410,6 +1561,7 @@ function desenharCena() {
 function loopPrincipal() {
   if (estadoJogo.status === "jogando") {
     estadoJogo.frameAtual++;
+    atualizarPlataformas();
     atualizarSoldado();
     gerarInimigos();
     atualizarInimigos();
