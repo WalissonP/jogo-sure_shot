@@ -273,7 +273,7 @@ function atualizarSoldado() {
   }
 
   // Pulo
-  if (pular && soldado.noChao) { {
+  if (pular && soldado.noChao) {
     soldado.vy = soldado.forcaPulo;
     soldado.noChao = false;
   }
@@ -639,43 +639,7 @@ function atualizarHUD() {
   }
 }
 
-function desenharCena() {
-  const configNivel = NIVEIS[estadoJogo.nivelIndice];
-
-  // Fundo do nível
-  ctx.fillStyle = configNivel.corCeu;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.save();
-  ctx.translate(-estadoJogo.cameraX, 0);
-
-  // Chão
-  ctx.fillStyle = configNivel.corChao;
-  ctx.fillRect(0, CHAO_Y, configNivel.distanciaMeta + 200, canvas.height - CHAO_Y);
-
-  // Linha de superfície do chão
-  ctx.fillStyle = "#5c7a62";
-  ctx.fillRect(0, CHAO_Y, configNivel.distanciaMeta + 200, 5);
-
-  // Plataformas
-  ctx.fillStyle = "#6c7a89";
-  for (let i = 0; i < estadoJogo.plataformas.length; i++) {
-    const plat = estadoJogo.plataformas[i];
-    ctx.fillRect(plat.x, plat.y, plat.largura, plat.altura);
-  }
-
-  // Bandeira/Portal de fim de setor (Níveis 1 a 4)
-  if (configNivel.numero < 5) {
-    ctx.fillStyle = "#f0b429";
-    ctx.fillRect(configNivel.distanciaMeta - 35, CHAO_Y - 90, 12, 90);
-    ctx.fillStyle = "#38b2ac";
-    ctx.fillRect(configNivel.distanciaMeta - 23, CHAO_Y - 90, 34, 24);
-  }
-
-  // Soldado
-  desenharSoldado()
-
-  function desenharSoldado() {
+function desenharSoldado() {
   const centroX = soldado.x + soldado.largura / 2;
   const baseY = soldado.y + soldado.alturaAtual;
   const andando = Math.abs(soldado.vx) > 0.1 && soldado.noChao;
@@ -691,10 +655,8 @@ function desenharCena() {
 
   if (soldado.agachado) {
     // --- POSE AGACHADO (COM RESPIRAÇÃO SUTIL QUANDO PARADO) ---
-    const respiracaoAgachadoY =
-      paradoNoChao && soldado.noChao ? cicloRespiracao * 0.9 : 0;
-    const expansaoAgachado =
-      paradoNoChao && soldado.noChao ? Math.max(0, cicloRespiracao) * 0.7 : 0;
+    const respiracaoAgachadoY = paradoNoChao ? cicloRespiracao * 0.9 : 0;
+    const expansaoAgachado = paradoNoChao ? Math.max(0, cicloRespiracao) * 0.7 : 0;
 
     // Perna traseira dobrada no chão
     ctx.fillStyle = "#2b3a2e";
@@ -777,7 +739,7 @@ function desenharCena() {
     ctx.fillRect(
       -6,
       -42 + balancoTronco - expansaoPeito * 0.5,
-      13 + expansaoAgachado ?? 13 + expansaoPeito,
+      13 + expansaoPeito,
       17 + expansaoPeito * 0.5
     );
     ctx.fillStyle = "#5c7a62"; // Bolsos do colete
@@ -850,6 +812,48 @@ function desenharFuzil(origemX, origemY, angulo, atirouAgora) {
 
   ctx.restore();
 }
+
+function desenharCena() {
+  const configNivel = NIVEIS[estadoJogo.nivelIndice];
+
+  // Fundo do nível
+  ctx.fillStyle = configNivel.corCeu;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.save();
+  ctx.translate(-estadoJogo.cameraX, 0);
+
+  // Chão
+  ctx.fillStyle = configNivel.corChao;
+  ctx.fillRect(0, CHAO_Y, configNivel.distanciaMeta + 200, canvas.height - CHAO_Y);
+
+  // Linha de superfície do chão
+  ctx.fillStyle = "#5c7a62";
+  ctx.fillRect(0, CHAO_Y, configNivel.distanciaMeta + 200, 5);
+
+  // Plataformas
+  ctx.fillStyle = "#6c7a89";
+  for (let i = 0; i < estadoJogo.plataformas.length; i++) {
+    const plat = estadoJogo.plataformas[i];
+    ctx.fillRect(plat.x, plat.y, plat.largura, plat.altura);
+  }
+
+  // Bandeira/Portal de fim de setor (Níveis 1 a 4)
+  if (configNivel.numero < 5) {
+    ctx.fillStyle = "#f0b429";
+    ctx.fillRect(configNivel.distanciaMeta - 35, CHAO_Y - 90, 12, 90);
+    ctx.fillStyle = "#38b2ac";
+    ctx.fillRect(configNivel.distanciaMeta - 23, CHAO_Y - 90, 34, 24);
+  }
+
+  // Soldado (pisca quando está invulnerável após tomar dano)
+  const piscando =
+    estadoJogo.frameAtual < estadoJogo.invulneravelAte &&
+    Math.floor(estadoJogo.frameAtual / 4) % 2 === 0;
+
+  if (!piscando) {
+    desenharSoldado();
+  }
 
   // Inimigos
   for (let i = 0; i < estadoJogo.inimigos.length; i++) {
@@ -925,7 +929,7 @@ function loopPrincipal() {
     atualizarProjeteis();
     atualizarHUD();
   }
-  
+
   desenharCena();
   requestAnimationFrame(loopPrincipal);
 }
