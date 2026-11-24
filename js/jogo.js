@@ -85,6 +85,8 @@ const estadoJogo = {
   frameAtual: 0,
   ultimoTiroFrame: 0,
   invulneravelAte: 0,
+  danoSoldadoFrames: 0,
+  recuoSoldadoX: 0,
   avisoNivelFrames: 0,
   plataformas: [],
   obstaculos: [],
@@ -124,6 +126,8 @@ function iniciarPartida() {
   estadoJogo.frameAtual = 0;
   estadoJogo.ultimoTiroFrame = 0;
   estadoJogo.invulneravelAte = 0;
+  estadoJogo.danoSoldadoFrames = 0;
+  estadoJogo.recuoSoldadoX = 0;
 
   soldado.vida = soldado.vidaMaxima;
   soldado.direcao = 1;
@@ -145,6 +149,8 @@ function carregarNivel(indice) {
   estadoJogo.tirosJogador = [];
   estadoJogo.tirosInimigos = [];
   estadoJogo.boss = null;
+  estadoJogo.danoSoldadoFrames = 0;
+  estadoJogo.recuoSoldadoX = 0;
   estadoJogo.avisoNivelFrames = 140;
 
   soldado.x = 100;
@@ -159,7 +165,6 @@ function carregarNivel(indice) {
 
   estadoJogo.plataformas = [];
   if (configNivel.numero === 1) {
-    // Plataformas de concreto e vigas metálicas no cenário pós-apocalíptico
     for (let posX = 430; posX < configNivel.distanciaMeta - 320; posX += 480) {
       estadoJogo.plataformas.push({
         x: posX,
@@ -177,7 +182,6 @@ function carregarNivel(indice) {
       });
     }
 
-    // Escombros fixos no chão
     for (let obsX = 560; obsX < configNivel.distanciaMeta - 350; obsX += 640) {
       estadoJogo.obstaculos.push({
         x: obsX,
@@ -188,10 +192,7 @@ function carregarNivel(indice) {
       });
     }
 
-    // Objetos interativos no chão: caixotes empurráveis/de apoio e barris destrutíveis
     configurarItensChaoFase1(configNivel.distanciaMeta);
-
-    // Rastejadores posicionados em pontos variados do mapa (emboscada ao chegar perto)
     posicionarRastejadoresMapa();
   } else if (configNivel.numero < 5) {
     for (let posX = 420; posX < configNivel.distanciaMeta - 300; posX += 460) {
@@ -246,11 +247,11 @@ function configurarItensChaoFase1(distanciaMeta) {
 
 function posicionarRastejadoresMapa() {
   const pontosMapa = [
-    { x: 490, alcance: 250, velocidadeAtaque: 3.8 },
-    { x: 860, alcance: 270, velocidadeAtaque: 4.1 },
-    { x: 1240, alcance: 280, velocidadeAtaque: 4.3 },
-    { x: 1620, alcance: 260, velocidadeAtaque: 4.5 },
-    { x: 1930, alcance: 250, velocidadeAtaque: 4.7 }
+    { x: 520, alcance: 240, velocidadeAtaque: 1.35 },
+    { x: 900, alcance: 255, velocidadeAtaque: 1.45 },
+    { x: 1280, alcance: 265, velocidadeAtaque: 1.55 },
+    { x: 1650, alcance: 255, velocidadeAtaque: 1.65 },
+    { x: 1950, alcance: 245, velocidadeAtaque: 1.75 }
   ];
 
   for (let i = 0; i < pontosMapa.length; i++) {
@@ -259,7 +260,7 @@ function posicionarRastejadoresMapa() {
   }
 }
 
-function criarRastejador(x, alcance = 260, velocidadeAtaque = 4.2, indice = 0) {
+function criarRastejador(x, alcance = 250, velocidadeAtaque = 1.5, indice = 0) {
   return {
     tipo: "rastejador",
     x: x,
@@ -275,6 +276,7 @@ function criarRastejador(x, alcance = 260, velocidadeAtaque = 4.2, indice = 0) {
     velocidadeAtaque: velocidadeAtaque,
     direcaoOlhar: -1,
     faseCobra: indice * 1.1,
+    danoFrames: 0,
     cor: "#52b788"
   };
 }
@@ -290,7 +292,8 @@ function criarBoss() {
     vida: 35,
     vidaMaxima: 35,
     cadenciaTiro: 75,
-    ultimoTiro: 0
+    ultimoTiro: 0,
+    danoFrames: 0
   };
 }
 
@@ -333,6 +336,11 @@ function registrarEventos() {
 // 6. LÓGICA DO SOLDADO, ITENS DO CHÃO E DISPAROS
 // =========================================================
 function atualizarSoldado() {
+  if (estadoJogo.danoSoldadoFrames > 0) {
+    estadoJogo.danoSoldadoFrames--;
+  }
+  estadoJogo.recuoSoldadoX *= 0.78;
+
   const esquerda = teclas["KeyA"] || teclas["ArrowLeft"];
   const direita = teclas["KeyD"] || teclas["ArrowRight"];
   const cima = teclas["KeyW"] || teclas["ArrowUp"];
@@ -386,7 +394,6 @@ function atualizarSoldado() {
     soldado.x = configNivel.distanciaMeta - soldado.largura;
   }
 
-  // Colisão com plataformas e escombros (permite pousar em cima)
   soldado.noChao = false;
   for (let i = 0; i < estadoJogo.plataformas.length; i++) {
     const plat = estadoJogo.plataformas[i];
@@ -416,7 +423,6 @@ function atualizarSoldado() {
     }
   }
 
-  // Interação com itens no chão (caixotes empurráveis/apoio e barris)
   for (let i = 0; i < estadoJogo.itensChao.length; i++) {
     const item = estadoJogo.itensChao[i];
     if (item.destruido) continue;
@@ -439,7 +445,6 @@ function atualizarSoldado() {
 
     if (dentroX && sobrepoeY) {
       if (item.tipo === "caixote") {
-        // Empurra o caixote suavemente na direção do movimento
         if (soldado.x >= xAnterior) {
           item.x += soldado.vx * 0.7;
         } else {
@@ -447,7 +452,6 @@ function atualizarSoldado() {
         }
         item.x = Math.max(estadoJogo.cameraX, Math.min(configNivel.distanciaMeta - item.largura, item.x));
       } else if (item.tipo === "barril") {
-        // Bloqueia passagem lateral pelo barril intacto
         if (soldado.x + soldado.largura / 2 < item.x + item.largura / 2) {
           soldado.x = item.x - soldado.largura;
         } else {
@@ -515,7 +519,6 @@ function dispararTiroSoldado() {
 function gerarInimigos() {
   const configNivel = NIVEIS[estadoJogo.nivelIndice];
 
-  // Na Fase 1 os rastejadores já ficam espalhados pelo mapa e atacam ao notar o soldado
   if (configNivel.numero === 1) return;
 
   if (estadoJogo.frameAtual % configNivel.intervaloSpawn !== 0) return;
@@ -532,7 +535,7 @@ function gerarInimigos() {
       : Math.min(estadoJogo.cameraX + canvas.width + 30, configNivel.distanciaMeta - 80);
 
   if (tipoEscolhido === "rastejador") {
-    estadoJogo.inimigos.push(criarRastejador(spawnX, 260, 4.0, estadoJogo.frameAtual));
+    estadoJogo.inimigos.push(criarRastejador(spawnX, 250, 1.55, estadoJogo.frameAtual));
   } else if (tipoEscolhido === "saltador") {
     estadoJogo.inimigos.push({
       tipo: "saltador",
@@ -544,6 +547,7 @@ function gerarInimigos() {
       vy: -9,
       vida: 2,
       pontos: 80,
+      danoFrames: 0,
       cor: "#d19a66"
     });
   } else if (tipoEscolhido === "atirador") {
@@ -557,6 +561,7 @@ function gerarInimigos() {
       vy: 0,
       vida: 2,
       pontos: 110,
+      danoFrames: 0,
       cor: "#c678dd",
       ultimoTiro: estadoJogo.frameAtual
     });
@@ -571,6 +576,7 @@ function gerarInimigos() {
       vy: 0,
       vida: 1,
       pontos: 90,
+      danoFrames: 0,
       cor: "#56b6c2"
     });
   } else if (tipoEscolhido === "blindado") {
@@ -584,6 +590,7 @@ function gerarInimigos() {
       vy: 0,
       vida: 5,
       pontos: 180,
+      danoFrames: 0,
       cor: "#e5c07b"
     });
   }
@@ -594,13 +601,15 @@ function atualizarInimigos() {
 
   for (let i = estadoJogo.inimigos.length - 1; i >= 0; i--) {
     const inimigo = estadoJogo.inimigos[i];
+    if (inimigo.danoFrames > 0) {
+      inimigo.danoFrames--;
+    }
 
     if (inimigo.tipo === "rastejador") {
       const centroInimigoX = inimigo.x + inimigo.largura / 2;
       const distanciaX = centroSoldadoX - centroInimigoX;
       const distanciaAbs = Math.abs(distanciaX);
 
-      // Fica no ponto do mapa até o soldado chegar perto; então avança para atacar
       if (inimigo.estado === "esperando" && distanciaAbs <= inimigo.alcanceAtaque) {
         inimigo.estado = "atacando";
       }
@@ -614,9 +623,9 @@ function atualizarInimigos() {
         inimigo.direcaoOlhar = distanciaX >= 0 ? 1 : -1;
       }
 
-      // Ondulação tipo cobra no chão (mais rápida quando está atacando)
-      const frequencia = inimigo.estado === "atacando" ? 0.28 : 0.12;
-      const amplitude = inimigo.estado === "atacando" ? 4 : 2;
+      // Ondulação lenta e controlada para dar margem de reação ao jogador
+      const frequencia = inimigo.estado === "atacando" ? 0.16 : 0.1;
+      const amplitude = inimigo.estado === "atacando" ? 2.5 : 1.5;
       const onda = Math.sin(estadoJogo.frameAtual * frequencia + inimigo.faseCobra);
       inimigo.y = CHAO_Y - inimigo.altura - Math.abs(onda) * amplitude;
     } else {
@@ -650,7 +659,8 @@ function atualizarInimigos() {
     }
 
     if (colidiu(soldado, inimigo)) {
-      aplicarDanoSoldado(15);
+      const direcaoImpacto = soldado.x + soldado.largura / 2 < inimigo.x + inimigo.largura / 2 ? -1 : 1;
+      aplicarDanoSoldado(15, direcaoImpacto);
     }
 
     if (inimigo.x + inimigo.largura < estadoJogo.cameraX - 120) {
@@ -662,6 +672,10 @@ function atualizarInimigos() {
 function atualizarBoss() {
   const boss = estadoJogo.boss;
   if (!boss) return;
+
+  if (boss.danoFrames > 0) {
+    boss.danoFrames--;
+  }
 
   boss.x += boss.vx;
   if (boss.x <= 460 || boss.x + boss.largura >= canvas.width - 20) {
@@ -682,7 +696,8 @@ function atualizarBoss() {
   }
 
   if (colidiu(soldado, boss)) {
-    aplicarDanoSoldado(20);
+    const direcaoImpacto = soldado.x + soldado.largura / 2 < boss.x + boss.largura / 2 ? -1 : 1;
+    aplicarDanoSoldado(20, direcaoImpacto);
   }
 }
 
@@ -697,7 +712,6 @@ function atualizarProjeteis() {
 
     let acertou = false;
 
-    // Verifica acerto em barris destrutíveis no chão
     for (let k = 0; k < estadoJogo.itensChao.length; k++) {
       const item = estadoJogo.itensChao[k];
       if (!item.destruido && item.tipo === "barril" && colidiu(tiro, item)) {
@@ -712,12 +726,12 @@ function atualizarProjeteis() {
       for (let j = estadoJogo.inimigos.length - 1; j >= 0; j--) {
         const inimigo = estadoJogo.inimigos[j];
         if (colidiu(tiro, inimigo)) {
-          // A bala só passa direto se não encostar; para rastejadores, o tiro precisa ter saído agachado ("baixo")
           if (inimigo.tipo === "rastejador" && tiro.nivelTiro !== "baixo") {
             continue;
           }
 
           inimigo.vida -= 1;
+          inimigo.danoFrames = 10;
           acertou = true;
           if (inimigo.vida <= 0) {
             estadoJogo.pontuacao += inimigo.pontos;
@@ -730,6 +744,7 @@ function atualizarProjeteis() {
 
     if (!acertou && estadoJogo.boss && colidiu(tiro, estadoJogo.boss)) {
       estadoJogo.boss.vida -= 1;
+      estadoJogo.boss.danoFrames = 8;
       acertou = true;
       estadoJogo.pontuacao += 25;
 
@@ -765,7 +780,8 @@ function atualizarProjeteis() {
     };
 
     if (colidiu(tiro, hitboxSoldado)) {
-      aplicarDanoSoldado(12);
+      const direcaoImpacto = tiro.vx < 0 ? -1 : 1;
+      aplicarDanoSoldado(12, direcaoImpacto);
       estadoJogo.tirosInimigos.splice(i, 1);
       continue;
     }
@@ -776,11 +792,13 @@ function atualizarProjeteis() {
   }
 }
 
-function aplicarDanoSoldado(dano) {
+function aplicarDanoSoldado(dano, direcaoImpacto = -1) {
   if (estadoJogo.frameAtual < estadoJogo.invulneravelAte) return;
 
   soldado.vida = Math.max(0, soldado.vida - dano);
   estadoJogo.invulneravelAte = estadoJogo.frameAtual + 45;
+  estadoJogo.danoSoldadoFrames = 14;
+  estadoJogo.recuoSoldadoX = direcaoImpacto * 8;
 
   if (soldado.vida <= 0) {
     atualizarHUD();
@@ -908,7 +926,6 @@ function desenharItensChao() {
     if (item.destruido) continue;
 
     if (item.tipo === "caixote") {
-      // Caixote militar/de carga empurrável
       ctx.fillStyle = "#7c5832";
       ctx.fillRect(item.x, item.y, item.largura, item.altura);
       ctx.strokeStyle = "#a37846";
@@ -919,7 +936,6 @@ function desenharItensChao() {
       ctx.lineTo(item.x + item.largura - 4, item.y + item.altura - 4);
       ctx.stroke();
     } else if (item.tipo === "barril") {
-      // Barril oxidado de combustível
       ctx.fillStyle = "#9e3b24";
       ctx.fillRect(item.x, item.y, item.largura, item.altura);
       ctx.fillStyle = "#d99b26";
@@ -961,32 +977,38 @@ function desenharPlataformas(configNivel) {
 
 function desenharRastejadorAlien(inimigo) {
   const baseY = inimigo.y + inimigo.altura;
-  const freq = inimigo.estado === "atacando" ? 0.28 : 0.14;
+  const freq = inimigo.estado === "atacando" ? 0.18 : 0.12;
   const tempo = estadoJogo.frameAtual * freq + inimigo.faseCobra;
   const dir = inimigo.direcaoOlhar || -1;
+  const emDano = inimigo.danoFrames > 0;
+  const tremorDano = emDano ? Math.sin(estadoJogo.frameAtual * 1.4) * 3.5 : 0;
 
   ctx.save();
-  const centroX = inimigo.x + inimigo.largura / 2;
+  const centroX = inimigo.x + inimigo.largura / 2 + tremorDano;
   ctx.translate(centroX, baseY);
-  ctx.scale(-dir, 1); // Espelha quando olha/ataca para a direita
+  ctx.scale(-dir, 1);
 
   const cabecaX = -14;
-  const cabecaY = -12 + Math.sin(tempo) * 2.5;
+  const cabecaY = -12 + Math.sin(tempo) * 2.2;
 
   const segmentos = 6;
   for (let s = segmentos; s >= 1; s--) {
     const proporcao = s / segmentos;
     const segX = cabecaX + s * 7;
-    const ondaY = Math.sin(tempo - s * 0.85) * (4.5 * proporcao);
+    const ondaY = Math.sin(tempo - s * 0.85) * (4 * proporcao);
     const segY = -9 + ondaY;
     const raio = Math.max(3.5, 9 * (1 - proporcao * 0.55));
 
-    ctx.fillStyle = s % 2 === 0 ? "#388e6c" : "#2b6e54";
+    if (emDano) {
+      ctx.fillStyle = s % 2 === 0 ? "#ffffff" : "#ff6b6b";
+    } else {
+      ctx.fillStyle = s % 2 === 0 ? "#388e6c" : "#2b6e54";
+    }
     ctx.beginPath();
     ctx.arc(segX, segY, raio, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = inimigo.estado === "atacando" ? "#ff595e" : "#9ef01a";
+    ctx.fillStyle = emDano ? "#ffd43b" : inimigo.estado === "atacando" ? "#ff595e" : "#9ef01a";
     ctx.beginPath();
     ctx.moveTo(segX - 2, segY - raio);
     ctx.lineTo(segX + 1, segY - raio - 4 * (1 - proporcao * 0.4));
@@ -995,7 +1017,7 @@ function desenharRastejadorAlien(inimigo) {
     ctx.fill();
   }
 
-  ctx.fillStyle = "#40916c";
+  ctx.fillStyle = emDano ? "#ffffff" : "#40916c";
   ctx.beginPath();
   ctx.ellipse(cabecaX, cabecaY, 11, 8.5, -0.15, 0, Math.PI * 2);
   ctx.fill();
@@ -1008,7 +1030,7 @@ function desenharRastejadorAlien(inimigo) {
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = inimigo.estado === "atacando" ? "#ff2a55" : "#ffbe0b";
+  ctx.fillStyle = emDano ? "#ff2a55" : inimigo.estado === "atacando" ? "#ff2a55" : "#ffbe0b";
   ctx.beginPath();
   ctx.arc(cabecaX - 2, cabecaY - 3, 3.2, 0, Math.PI * 2);
   ctx.fill();
@@ -1018,8 +1040,22 @@ function desenharRastejadorAlien(inimigo) {
   ctx.restore();
 }
 
+function desenharInimigoPadrao(inimigo) {
+  const emDano = inimigo.danoFrames > 0;
+  const tremor = emDano ? Math.sin(estadoJogo.frameAtual * 1.4) * 3 : 0;
+  ctx.fillStyle = emDano ? "#ffffff" : inimigo.cor;
+  ctx.fillRect(inimigo.x + tremor, inimigo.y, inimigo.largura, inimigo.altura);
+  if (emDano) {
+    ctx.strokeStyle = "#ff4d4f";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(inimigo.x + tremor, inimigo.y, inimigo.largura, inimigo.altura);
+  }
+}
+
 function desenharSoldado() {
-  const centroX = soldado.x + soldado.largura / 2;
+  const emDano = estadoJogo.danoSoldadoFrames > 0;
+  const tremorDano = emDano ? Math.sin(estadoJogo.frameAtual * 1.5) * 3 : 0;
+  const centroX = soldado.x + soldado.largura / 2 + estadoJogo.recuoSoldadoX + tremorDano;
   const baseY = soldado.y + soldado.alturaAtual;
   const andando = Math.abs(soldado.vx) > 0.1 && soldado.noChao;
   const paradoNoChao = !andando && soldado.noChao;
@@ -1035,24 +1071,24 @@ function desenharSoldado() {
     const respiracaoAgachadoY = paradoNoChao ? cicloRespiracao * 0.9 : 0;
     const expansaoAgachado = paradoNoChao ? Math.max(0, cicloRespiracao) * 0.7 : 0;
 
-    ctx.fillStyle = "#2b3a2e";
+    ctx.fillStyle = emDano ? "#ff8787" : "#2b3a2e";
     ctx.fillRect(-12, -10, 16, 7);
     ctx.fillStyle = "#1a1d20";
     ctx.fillRect(-15, -7, 8, 7);
 
-    ctx.fillStyle = "#3b4f3f";
+    ctx.fillStyle = emDano ? "#ffa8a8" : "#3b4f3f";
     ctx.fillRect(-2, -14, 12, 9);
     ctx.fillStyle = "#1a1d20";
     ctx.fillRect(4, -7, 10, 7);
 
-    ctx.fillStyle = "#4a634e";
+    ctx.fillStyle = emDano ? "#ff6b6b" : "#4a634e";
     ctx.fillRect(
       -9,
       -26 + respiracaoAgachadoY - expansaoAgachado * 0.4,
       18 + expansaoAgachado,
       15 + expansaoAgachado * 0.4
     );
-    ctx.fillStyle = "#2d3b30";
+    ctx.fillStyle = emDano ? "#fa5252" : "#2d3b30";
     ctx.fillRect(
       -5,
       -24 + respiracaoAgachadoY - expansaoAgachado * 0.4,
@@ -1060,9 +1096,9 @@ function desenharSoldado() {
       11 + expansaoAgachado * 0.4
     );
 
-    ctx.fillStyle = "#d9a077";
+    ctx.fillStyle = emDano ? "#ffe3e3" : "#d9a077";
     ctx.fillRect(-4, -34 + respiracaoAgachadoY, 10, 8);
-    ctx.fillStyle = "#2f4233";
+    ctx.fillStyle = emDano ? "#ff8787" : "#2f4233";
     ctx.beginPath();
     ctx.arc(1, -33 + respiracaoAgachadoY, 7, Math.PI, 0);
     ctx.fill();
@@ -1080,42 +1116,42 @@ function desenharSoldado() {
       ? Math.abs(cicloPasso) * 1.5
       : deslocamentoRespiracaoY;
 
-    ctx.fillStyle = "#2b3a2e";
+    ctx.fillStyle = emDano ? "#ff8787" : "#2b3a2e";
     ctx.fillRect(-5 - deslocamentoPerna, -22 + elevacaoPulo, 8, 16);
     ctx.fillStyle = "#1a1d20";
     ctx.fillRect(-5 - deslocamentoPerna, -7 + elevacaoPulo, 10, 7);
 
-    ctx.fillStyle = "#3b4f3f";
+    ctx.fillStyle = emDano ? "#ffa8a8" : "#3b4f3f";
     ctx.fillRect(-3 + deslocamentoPerna, -22, 8, 16);
     ctx.fillStyle = "#1a1d20";
     ctx.fillRect(-3 + deslocamentoPerna, -7, 11, 7);
 
-    ctx.fillStyle = "#263329";
+    ctx.fillStyle = emDano ? "#ff6b6b" : "#263329";
     ctx.fillRect(-13, -42 + balancoTronco, 6, 17);
 
-    ctx.fillStyle = "#4a634e";
+    ctx.fillStyle = emDano ? "#ff6b6b" : "#4a634e";
     ctx.fillRect(
       -8,
       -44 + balancoTronco - expansaoPeito * 0.5,
       16 + expansaoPeito,
       23 + expansaoPeito * 0.5
     );
-    ctx.fillStyle = "#2d3b30";
+    ctx.fillStyle = emDano ? "#fa5252" : "#2d3b30";
     ctx.fillRect(
       -6,
       -42 + balancoTronco - expansaoPeito * 0.5,
       13 + expansaoPeito,
       17 + expansaoPeito * 0.5
     );
-    ctx.fillStyle = "#5c7a62";
+    ctx.fillStyle = emDano ? "#ffc9c9" : "#5c7a62";
     ctx.fillRect(-4, -33 + balancoTronco, 4, 6);
     ctx.fillRect(1, -33 + balancoTronco, 4, 6);
 
-    ctx.fillStyle = "#d9a077";
+    ctx.fillStyle = emDano ? "#ffe3e3" : "#d9a077";
     ctx.fillRect(-3, -47 + balancoTronco, 6, 4);
     ctx.fillRect(-5, -56 + balancoTronco, 11, 10);
 
-    ctx.fillStyle = "#2f4233";
+    ctx.fillStyle = emDano ? "#ff8787" : "#2f4233";
     ctx.beginPath();
     ctx.arc(0, -54 + balancoTronco, 7.5, Math.PI, 0);
     ctx.fill();
@@ -1203,8 +1239,19 @@ function desenharCena() {
     estadoJogo.frameAtual < estadoJogo.invulneravelAte &&
     Math.floor(estadoJogo.frameAtual / 4) % 2 === 0;
 
-  if (!piscando) {
+  if (!piscando || estadoJogo.danoSoldadoFrames > 0) {
     desenharSoldado();
+  }
+
+  // Flash vermelho sutil sobre o soldado no instante do impacto
+  if (estadoJogo.danoSoldadoFrames > 0) {
+    ctx.fillStyle = "rgba(255, 59, 48, 0.28)";
+    ctx.fillRect(
+      soldado.x + estadoJogo.recuoSoldadoX - 4,
+      soldado.y - 4,
+      soldado.largura + 8,
+      soldado.alturaAtual + 8
+    );
   }
 
   for (let i = 0; i < estadoJogo.inimigos.length; i++) {
@@ -1212,19 +1259,21 @@ function desenharCena() {
     if (inimigo.tipo === "rastejador") {
       desenharRastejadorAlien(inimigo);
     } else {
-      ctx.fillStyle = inimigo.cor;
-      ctx.fillRect(inimigo.x, inimigo.y, inimigo.largura, inimigo.altura);
+      desenharInimigoPadrao(inimigo);
     }
   }
 
   if (estadoJogo.boss) {
     const boss = estadoJogo.boss;
-    ctx.fillStyle = "#e03131";
-    ctx.fillRect(boss.x, boss.y, boss.largura, boss.altura);
+    const bossEmDano = boss.danoFrames > 0;
+    const tremorBoss = bossEmDano ? Math.sin(estadoJogo.frameAtual * 1.4) * 3 : 0;
+
+    ctx.fillStyle = bossEmDano ? "#ff8787" : "#e03131";
+    ctx.fillRect(boss.x + tremorBoss, boss.y, boss.largura, boss.altura);
 
     ctx.fillStyle = "#212529";
-    ctx.fillRect(boss.x - 16, boss.y + 34, 20, 12);
-    ctx.fillRect(boss.x - 16, boss.y + boss.altura - 26, 20, 12);
+    ctx.fillRect(boss.x + tremorBoss - 16, boss.y + 34, 20, 12);
+    ctx.fillRect(boss.x + tremorBoss - 16, boss.y + boss.altura - 26, 20, 12);
   }
 
   ctx.fillStyle = "#ffe066";
