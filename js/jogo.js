@@ -679,7 +679,9 @@ function desenharCena() {
   const centroX = soldado.x + soldado.largura / 2;
   const baseY = soldado.y + soldado.alturaAtual;
   const andando = Math.abs(soldado.vx) > 0.1 && soldado.noChao;
+  const paradoNoChao = !andando && soldado.noChao && !soldado.agachado;
   const cicloPasso = andando ? Math.sin(estadoJogo.frameAtual * 0.35) : 0;
+  const cicloRespiracao = paradoNoChao ? Math.sin(estadoJogo.frameAtual * 0.08) : 0;
   const atirouAgora = estadoJogo.frameAtual - estadoJogo.ultimoTiroFrame <= 3;
 
   ctx.save();
@@ -721,10 +723,16 @@ function desenharCena() {
     // Fuzil na posição baixa
     desenharFuzil(2, -18, 0, atirouAgora);
   } else {
-    // --- POSE EM PÉ / CORRENDO / PULANDO ---
+    // --- POSE EM PÉ / RESPIRANDO / CORRENDO / PULANDO ---
     const deslocamentoPerna = soldado.noChao ? cicloPasso * 7 : 5;
     const elevacaoPulo = soldado.noChao ? 0 : -4;
-    const balancoTronco = andando ? Math.abs(cicloPasso) * 1.5 : 0;
+
+    // Respiração suave quando parado; balanço de passada quando andando
+    const deslocamentoRespiracaoY = cicloRespiracao * 1.4;
+    const expansaoPeito = Math.max(0, cicloRespiracao) * 1.2;
+    const balancoTronco = andando
+      ? Math.abs(cicloPasso) * 1.5
+      : deslocamentoRespiracaoY;
 
     // Perna traseira
     ctx.fillStyle = "#2b3a2e";
@@ -742,11 +750,21 @@ function desenharCena() {
     ctx.fillStyle = "#263329";
     ctx.fillRect(-13, -42 + balancoTronco, 6, 17);
 
-    // Tronco (uniforme + colete balístico)
+    // Tronco (uniforme + colete balístico com respiração)
     ctx.fillStyle = "#4a634e";
-    ctx.fillRect(-8, -44 + balancoTronco, 16, 23);
+    ctx.fillRect(
+      -8,
+      -44 + balancoTronco - expansaoPeito * 0.5,
+      16 + expansaoPeito,
+      23 + expansaoPeito * 0.5
+    );
     ctx.fillStyle = "#2d3b30"; // Colete tático
-    ctx.fillRect(-6, -42 + balancoTronco, 13, 17);
+    ctx.fillRect(
+      -6,
+      -42 + balancoTronco - expansaoPeito * 0.5,
+      13 + expansaoPeito,
+      17 + expansaoPeito * 0.5
+    );
     ctx.fillStyle = "#5c7a62"; // Bolsos do colete
     ctx.fillRect(-4, -33 + balancoTronco, 4, 6);
     ctx.fillRect(1, -33 + balancoTronco, 4, 6);
