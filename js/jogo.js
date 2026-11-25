@@ -17,6 +17,7 @@ const pontuacaoFinalEl = document.querySelector("#pontuacao-final");
 
 const btnIniciar = document.querySelector("#btn-iniciar");
 const btnReiniciar = document.querySelector("#btn-reiniciar");
+const btnSom = document.querySelector("#btn-som");
 
 // =========================================================
 // 2. CONFIGURAÇÃO DOS 5 NÍVEIS E EVOLUÇÃO DOS INIMIGOS
@@ -74,9 +75,8 @@ const NIVEIS = [
 ];
 
 // =========================================================
-// 2B. TRILHA SONORA PROCEDURAL POR FASE (WEB AUDIO API)
+// 2B. TRILHA SONORA PROCEDURAL POR FASE E EFEITOS SONOROS (WEB AUDIO API)
 // =========================================================
-// Frequências em Hz (0 = pausa). Cada fase tem seu próprio tempo, onda e padrão.
 const MUSICAS_POR_FASE = {
   1: {
     bpm: 108,
@@ -158,6 +158,33 @@ const sistemaAudio = {
   ativo: true
 };
 
+const botaoSomCanvas = {
+  x: canvas.width - 122,
+  y: 12,
+  largura: 110,
+  altura: 28
+};
+
+function atualizarBotaoSomUI() {
+  if (!btnSom) return;
+  btnSom.textContent = sistemaAudio.ativo ? "🔊 Som: ON" : "🔇 Som: OFF";
+}
+
+function alternarSom() {
+  sistemaAudio.ativo = !sistemaAudio.ativo;
+  atualizarBotaoSomUI();
+
+  if (!sistemaAudio.ativo) {
+    pararMusicaFase();
+  } else {
+    garantirAudioContexto();
+    if (estadoJogo.status === "jogando") {
+      const configNivel = NIVEIS[estadoJogo.nivelIndice];
+      iniciarMusicaFase(configNivel.numero);
+    }
+  }
+}
+
 function garantirAudioContexto() {
   if (!sistemaAudio.ativo) return null;
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -173,7 +200,7 @@ function garantirAudioContexto() {
 }
 
 function tocarNotaSintetizada(freq, duracaoSeg, tipoOnda, ganhoMax, offsetFiltro = 1400) {
-  if (!freq || freq <= 0 || !sistemaAudio.ctx) return;
+  if (!freq || freq <= 0 || !sistemaAudio.ctx || !sistemaAudio.ativo) return;
 
   const agora = sistemaAudio.ctx.currentTime;
   const osc = sistemaAudio.ctx.createOscillator();
@@ -198,6 +225,106 @@ function tocarNotaSintetizada(freq, duracaoSeg, tipoOnda, ganhoMax, offsetFiltro
   osc.stop(agora + duracaoSeg);
 }
 
+function tocarSfxTiro() {
+  const audioCtx = garantirAudioContexto();
+  if (!audioCtx || !sistemaAudio.ativo) return;
+
+  const agora = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const ganho = audioCtx.createGain();
+
+  osc.type = "square";
+  osc.frequency.setValueAtTime(760, agora);
+  osc.frequency.exponentialRampToValueAtTime(160, agora + 0.085);
+
+  ganho.gain.setValueAtTime(0.055, agora);
+  ganho.gain.exponentialRampToValueAtTime(0.0001, agora + 0.09);
+
+  osc.connect(ganho);
+  ganho.connect(audioCtx.destination);
+
+  osc.start(agora);
+  osc.stop(agora + 0.095);
+}
+
+function tocarSfxPulo() {
+  const audioCtx = garantirAudioContexto();
+  if (!audioCtx || !sistemaAudio.ativo) return;
+
+  const agora = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const ganho = audioCtx.createGain();
+
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(210, agora);
+  osc.frequency.exponentialRampToValueAtTime(520, agora + 0.13);
+
+  ganho.gain.setValueAtTime(0.06, agora);
+  ganho.gain.exponentialRampToValueAtTime(0.0001, agora + 0.14);
+
+  osc.connect(ganho);
+  ganho.connect(audioCtx.destination);
+
+  osc.start(agora);
+  osc.stop(agora + 0.145);
+}
+
+function tocarSfxDano() {
+  const audioCtx = garantirAudioContexto();
+  if (!audioCtx || !sistemaAudio.ativo) return;
+
+  const agora = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const ganho = audioCtx.createGain();
+
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(190, agora);
+  osc.frequency.exponentialRampToValueAtTime(62, agora + 0.22);
+
+  ganho.gain.setValueAtTime(0.085, agora);
+  ganho.gain.exponentialRampToValueAtTime(0.0001, agora + 0.23);
+
+  osc.connect(ganho);
+  ganho.connect(audioCtx.destination);
+
+  osc.start(agora);
+  osc.stop(agora + 0.24);
+}
+
+function tocarSfxAcertoInimigo(eliminado = false) {
+  const audioCtx = garantirAudioContexto();
+  if (!audioCtx || !sistemaAudio.ativo) return;
+
+  const agora = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const ganho = audioCtx.createGain();
+
+  osc.type = eliminado ? "sawtooth" : "triangle";
+  osc.frequency.setValueAtTime(eliminado ? 310 : 420, agora);
+  osc.frequency.exponentialRampToValueAtTime(eliminado ? 75 : 190, agora + (eliminado ? 0.16 : 0.06));
+
+  ganho.gain.setValueAtTime(eliminado ? 0.065 : 0.04, agora);
+  ganho.gain.exponentialRampToValueAtTime(0.0001, agora + (eliminado ? 0.17 : 0.065));
+
+  osc.connect(ganho);
+  ganho.connect(audioCtx.destination);
+
+  osc.start(agora);
+  osc.stop(agora + (eliminado ? 0.18 : 0.07));
+}
+
+function tocarSfxFimPartida(venceu) {
+  const audioCtx = garantirAudioContexto();
+  if (!audioCtx || !sistemaAudio.ativo) return;
+
+  const notas = venceu ? [392.0, 493.88, 587.33, 783.99] : [293.66, 261.63, 220.0, 164.81];
+  notas.forEach((freq, idx) => {
+    setTimeout(() => {
+      tocarNotaSintetizada(freq, 0.22, "triangle", 0.065, 2400);
+    }, idx * 130);
+  });
+}
+
 function pararMusicaFase() {
   if (sistemaAudio.timerId !== null) {
     clearInterval(sistemaAudio.timerId);
@@ -209,7 +336,7 @@ function pararMusicaFase() {
 
 function iniciarMusicaFase(numeroFase) {
   const faixa = MUSICAS_POR_FASE[numeroFase];
-  if (!faixa) {
+  if (!faixa || !sistemaAudio.ativo) {
     pararMusicaFase();
     return;
   }
@@ -225,7 +352,6 @@ function iniciarMusicaFase(numeroFase) {
   sistemaAudio.faseAtiva = numeroFase;
   sistemaAudio.passoAtual = 0;
 
-  // Cada passo equivale a uma semicolcheia (1/4 de batida)
   const duracaoPassoSeg = 60 / faixa.bpm / 4;
   const intervaloMs = duracaoPassoSeg * 1000;
 
@@ -516,6 +642,7 @@ function criarBoss() {
 
 function finalizarPartida(venceu) {
   pararMusicaFase();
+  tocarSfxFimPartida(venceu);
   estadoJogo.status = venceu ? "vitoria" : "derrota";
   tituloFim.textContent = venceu ? "Missão Cumprida!" : "Soldado Abatido!";
   mensagemFim.textContent = venceu
@@ -532,9 +659,35 @@ function registrarEventos() {
   btnIniciar.addEventListener("click", iniciarPartida);
   btnReiniciar.addEventListener("click", iniciarPartida);
 
+  if (btnSom) {
+    btnSom.addEventListener("click", alternarSom);
+  }
+
+  canvas.addEventListener("click", function (evento) {
+    const rect = canvas.getBoundingClientRect();
+    const escalaX = canvas.width / rect.width;
+    const escalaY = canvas.height / rect.height;
+    const clickX = (evento.clientX - rect.left) * escalaX;
+    const clickY = (evento.clientY - rect.top) * escalaY;
+
+    if (
+      clickX >= botaoSomCanvas.x &&
+      clickX <= botaoSomCanvas.x + botaoSomCanvas.largura &&
+      clickY >= botaoSomCanvas.y &&
+      clickY <= botaoSomCanvas.y + botaoSomCanvas.altura
+    ) {
+      alternarSom();
+    }
+  });
+
   window.addEventListener("keydown", function (evento) {
     const codigo = evento.code;
     teclas[codigo] = true;
+
+    if (codigo === "KeyM" && !evento.repeat) {
+      alternarSom();
+      return;
+    }
 
     if (estadoJogo.status === "jogando") {
       garantirAudioContexto();
@@ -688,6 +841,7 @@ function atualizarSoldado() {
   if (pular && soldado.noChao && !soldado.deitado) {
     soldado.vy = soldado.forcaPulo;
     soldado.noChao = false;
+    tocarSfxPulo();
   }
 
   const xAnterior = soldado.x;
@@ -804,6 +958,7 @@ function atualizarSoldado() {
 
 function dispararTiroSoldado() {
   const velocidadeTiro = 10;
+  tocarSfxTiro();
 
   if (soldado.olhandoCima) {
     estadoJogo.tirosJogador.push({
@@ -1440,7 +1595,9 @@ function atualizarProjeteis() {
         inimigo.vida -= 1;
         inimigo.danoFrames = 10;
         acertou = true;
-        if (inimigo.vida <= 0) {
+        const eliminado = inimigo.vida <= 0;
+        tocarSfxAcertoInimigo(eliminado);
+        if (eliminado) {
           estadoJogo.pontuacao += inimigo.pontos;
           estadoJogo.inimigos.splice(j, 1);
         }
@@ -1453,8 +1610,10 @@ function atualizarProjeteis() {
       estadoJogo.boss.danoFrames = 8;
       acertou = true;
       estadoJogo.pontuacao += 25;
+      const bossEliminado = estadoJogo.boss.vida <= 0;
+      tocarSfxAcertoInimigo(bossEliminado);
 
-      if (estadoJogo.boss.vida <= 0) {
+      if (bossEliminado) {
         estadoJogo.pontuacao += 1000;
         estadoJogo.boss = null;
         atualizarHUD();
@@ -1538,6 +1697,7 @@ function atualizarParticulasDano() {
 function aplicarDanoSoldado(dano, direcaoImpacto = -1) {
   if (estadoJogo.frameAtual < estadoJogo.invulneravelAte) return;
 
+  tocarSfxDano();
   soldado.vida = Math.max(0, soldado.vida - dano);
   estadoJogo.invulneravelAte = estadoJogo.frameAtual + 45;
   estadoJogo.danoSoldadoFrames = 16;
@@ -1600,6 +1760,30 @@ function atualizarHUD() {
   } else {
     hudProgresso.textContent = estadoJogo.boss ? "BOSS!" : "100%";
   }
+}
+
+function desenharBotaoSomCanvas() {
+  const b = botaoSomCanvas;
+  ctx.save();
+  ctx.fillStyle = "rgba(15, 23, 42, 0.72)";
+  ctx.strokeStyle = sistemaAudio.ativo ? "#f0b429" : "#64748b";
+  ctx.lineWidth = 1.5;
+
+  ctx.beginPath();
+  ctx.roundRect(b.x, b.y, b.largura, b.altura, 6);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = sistemaAudio.ativo ? "#f8fafc" : "#94a3b8";
+  ctx.font = "bold 12px Segoe UI, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(
+    sistemaAudio.ativo ? "🔊 Som (M)" : "🔇 Mudo (M)",
+    b.x + b.largura / 2,
+    b.y + b.altura / 2
+  );
+  ctx.restore();
 }
 
 function desenharEntradaCaverna(xBase, configNivel) {
@@ -2525,6 +2709,8 @@ function desenharCena() {
     ctx.fillText(configNivel.nome, canvas.width / 2, 86);
     ctx.textAlign = "start";
   }
+
+  desenharBotaoSomCanvas();
 }
 
 // =========================================================
@@ -2551,5 +2737,6 @@ function loopPrincipal() {
 
 // Inicialização ao carregar o script
 registrarEventos();
+atualizarBotaoSomUI();
 desenharCena();
 loopPrincipal();
