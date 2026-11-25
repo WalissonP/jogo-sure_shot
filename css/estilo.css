@@ -22,65 +22,11 @@ body {
   background-color: #0b0f14;
 }
 
-.topo-jogo {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 16px;
-  background-color: #151d28;
-  border-bottom: 2px solid #2f3e52;
-  flex-shrink: 0;
-  z-index: 5;
-}
-
-.marca-topo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.titulo-jogo {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #f0b429;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.hud {
-  display: flex;
-  align-items: center;
-  gap: 22px;
-}
-
-.hud-item {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.hud-rotulo {
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  color: #829ab1;
-}
-
-.hud-item strong {
-  font-size: 1.05rem;
-  color: #ffffff;
-}
-
-.acoes-topo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .palco-wrapper {
   position: relative;
   flex: 1;
   width: 100%;
+  height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -112,6 +58,12 @@ body {
 
 .barra-lobby.oculto {
   display: none;
+}
+
+.acoes-lobby {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .overlay {
@@ -166,39 +118,6 @@ body {
   50% {
     opacity: 0.45;
     transform: scale(0.98);
-  }
-}
-
-.cartao-intro {
-  max-width: 620px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  animation: surgirIntro 0.45s ease-out;
-}
-
-.titulo-intro {
-  font-size: clamp(2rem, 4.5vw, 3.2rem);
-  color: #f0b429;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.texto-intro {
-  font-size: 1.05rem;
-  color: #d9e2ec;
-  line-height: 1.5;
-}
-
-@keyframes surgirIntro {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 
@@ -343,19 +262,4 @@ body {
 .btn-pequeno {
   padding: 6px 12px;
   font-size: 0.82rem;
-}
-
-@media (max-width: 760px) {
-  .topo-jogo {
-    flex-wrap: wrap;
-    padding: 6px 10px;
-    gap: 6px;
-  }
-
-  .hud {
-    order: 3;
-    width: 100%;
-    justify-content: space-around;
-    gap: 8px;
-  }
 }

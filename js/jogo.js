@@ -2,23 +2,16 @@
 // 1. SELEÇÃO DE ELEMENTOS DO DOM
 // =========================================================
 const appTelaCheia = document.querySelector("#app-tela-cheia");
-const palcoWrapper = document.querySelector("#palco-wrapper");
 const canvas = document.querySelector("#tela-jogo");
 const ctx = canvas.getContext("2d");
 
-const hudNivel = document.querySelector("#hud-nivel");
-const hudVida = document.querySelector("#hud-vida");
-const hudPontos = document.querySelector("#hud-pontos");
-const hudProgresso = document.querySelector("#hud-progresso");
-
 const barraLobby = document.querySelector("#barra-lobby");
 const statusLobbyTexto = document.querySelector("#status-lobby-texto");
+const btnLobbyMusica = document.querySelector("#btn-lobby-musica");
 const btnLobbyMenu = document.querySelector("#btn-lobby-menu");
 const btnResetProgresso = document.querySelector("#btn-reset-progresso");
 
 const overlayPressKey = document.querySelector("#overlay-press-key");
-const overlayIntro = document.querySelector("#overlay-intro");
-const btnPularIntro = document.querySelector("#btn-pular-intro");
 
 const overlayMenuPrincipal = document.querySelector("#overlay-menu-principal");
 const painelMenuOpcoes = document.querySelector("#painel-menu-opcoes");
@@ -27,7 +20,6 @@ const painelOpcoes = document.querySelector("#painel-opcoes");
 const painelSair = document.querySelector("#painel-sair");
 const mensagemSairEl = document.querySelector("#mensagem-sair");
 
-const btnMenuRapido = document.querySelector("#btn-menu-rapido");
 const btnMenuCampanha = document.querySelector("#btn-menu-campanha");
 const btnMenuControles = document.querySelector("#btn-menu-controles");
 const btnMenuOpcoes = document.querySelector("#btn-menu-opcoes");
@@ -35,7 +27,7 @@ const btnMenuSair = document.querySelector("#btn-menu-sair");
 
 const btnVoltarMenuControles = document.querySelector("#btn-voltar-menu-controles");
 const btnVoltarMenuOpcoes = document.querySelector("#btn-voltar-menu-opcoes");
-const btnOpcaoSom = document.querySelector("#btn-opcao-som");
+const btnOpcaoMusica = document.querySelector("#btn-opcao-musica");
 const btnOpcaoFullscreen = document.querySelector("#btn-opcao-fullscreen");
 const btnConfirmarSair = document.querySelector("#btn-confirmar-sair");
 const btnCancelarSair = document.querySelector("#btn-cancelar-sair");
@@ -47,8 +39,6 @@ const pontuacaoFinalEl = document.querySelector("#pontuacao-final");
 
 const btnReiniciar = document.querySelector("#btn-reiniciar");
 const btnVoltarLobby = document.querySelector("#btn-voltar-lobby");
-const btnSom = document.querySelector("#btn-som");
-const btnFullscreen = document.querySelector("#btn-fullscreen");
 
 // =========================================================
 // 2. CONFIGURAÇÃO DOS 3 NÍVEIS E MAPA ESTILO CUPHEAD
@@ -122,7 +112,7 @@ const NOS_LOBBY = [
 ];
 
 // =========================================================
-// 2B. TRILHA SONORA PROCEDURAL, FANFARRA DE VITÓRIA E SFX
+// 2B. TRILHA SONORA PROCEDURAL (APENAS MÚSICA MUTÁVEL) E SFX
 // =========================================================
 const MUSICAS_POR_FASE = {
   lobby: {
@@ -188,27 +178,38 @@ const sistemaAudio = {
   timerId: null,
   passoAtual: 0,
   faixaAtiva: null,
-  ativo: true
+  musicaAtiva: true
 };
 
-const botaoSomCanvas = {
-  x: canvas.width - 122,
-  y: 12,
-  largura: 110,
-  altura: 28
-};
-
-function atualizarBotaoSomUI() {
-  const rotulo = sistemaAudio.ativo ? "🔊 Som: ON" : "🔇 Som: OFF";
-  if (btnSom) btnSom.textContent = rotulo;
-  if (btnOpcaoSom) btnOpcaoSom.textContent = rotulo;
+// Liberado apenas a partir do lobby (lobby, jogando, vitoria_fase, derrota) e nas Opções
+function podeControlarMusica() {
+  if (estadoJogo.status === "menu" && !painelOpcoes.classList.contains("oculto")) {
+    return true;
+  }
+  return ["lobby", "jogando", "vitoria_fase", "derrota"].includes(estadoJogo.status);
 }
 
-function alternarSom() {
-  sistemaAudio.ativo = !sistemaAudio.ativo;
-  atualizarBotaoSomUI();
+function atualizarBotaoMusicaUI() {
+  const liberado = podeControlarMusica();
+  const rotulo = sistemaAudio.musicaAtiva ? "🎵 Música: ON" : "🔇 Música: OFF";
 
-  if (!sistemaAudio.ativo) {
+  if (btnLobbyMusica) {
+    btnLobbyMusica.textContent = rotulo;
+    btnLobbyMusica.disabled = !liberado;
+  }
+  if (btnOpcaoMusica) {
+    btnOpcaoMusica.textContent = rotulo;
+    btnOpcaoMusica.disabled = !liberado;
+  }
+}
+
+function alternarMusicaApenas() {
+  if (!podeControlarMusica()) return;
+
+  sistemaAudio.musicaAtiva = !sistemaAudio.musicaAtiva;
+  atualizarBotaoMusicaUI();
+
+  if (!sistemaAudio.musicaAtiva) {
     pararMusicaFase();
   } else {
     garantirAudioContexto();
@@ -222,7 +223,6 @@ function alternarSom() {
 }
 
 function garantirAudioContexto() {
-  if (!sistemaAudio.ativo) return null;
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   if (!AudioCtx) return null;
 
@@ -236,7 +236,7 @@ function garantirAudioContexto() {
 }
 
 function tocarNotaSintetizada(freq, duracaoSeg, tipoOnda, ganhoMax, offsetFiltro = 1400) {
-  if (!freq || freq <= 0 || !sistemaAudio.ctx || !sistemaAudio.ativo) return;
+  if (!freq || freq <= 0 || !sistemaAudio.ctx || !sistemaAudio.musicaAtiva) return;
 
   const agora = sistemaAudio.ctx.currentTime;
   const osc = sistemaAudio.ctx.createOscillator();
@@ -263,7 +263,7 @@ function tocarNotaSintetizada(freq, duracaoSeg, tipoOnda, ganhoMax, offsetFiltro
 
 function tocarSfxTiro() {
   const audioCtx = garantirAudioContexto();
-  if (!audioCtx || !sistemaAudio.ativo) return;
+  if (!audioCtx) return;
 
   const agora = audioCtx.currentTime;
   const osc = audioCtx.createOscillator();
@@ -285,7 +285,7 @@ function tocarSfxTiro() {
 
 function tocarSfxPulo() {
   const audioCtx = garantirAudioContexto();
-  if (!audioCtx || !sistemaAudio.ativo) return;
+  if (!audioCtx) return;
 
   const agora = audioCtx.currentTime;
   const osc = audioCtx.createOscillator();
@@ -307,7 +307,7 @@ function tocarSfxPulo() {
 
 function tocarSfxDano() {
   const audioCtx = garantirAudioContexto();
-  if (!audioCtx || !sistemaAudio.ativo) return;
+  if (!audioCtx) return;
 
   const agora = audioCtx.currentTime;
   const osc = audioCtx.createOscillator();
@@ -329,7 +329,7 @@ function tocarSfxDano() {
 
 function tocarSfxAcertoInimigo(eliminado = false) {
   const audioCtx = garantirAudioContexto();
-  if (!audioCtx || !sistemaAudio.ativo) return;
+  if (!audioCtx) return;
 
   const agora = audioCtx.currentTime;
   const osc = audioCtx.createOscillator();
@@ -351,7 +351,7 @@ function tocarSfxAcertoInimigo(eliminado = false) {
 
 function tocarMusiquinhaVitoriaFase() {
   const audioCtx = garantirAudioContexto();
-  if (!audioCtx || !sistemaAudio.ativo) return;
+  if (!audioCtx) return;
 
   const sequencia = [
     { freq: 523.25, delay: 0, dur: 0.12 },
@@ -364,7 +364,7 @@ function tocarMusiquinhaVitoriaFase() {
 
   sequencia.forEach((nota) => {
     setTimeout(() => {
-      if (!sistemaAudio.ativo || !sistemaAudio.ctx) return;
+      if (!sistemaAudio.ctx) return;
       tocarNotaSintetizada(nota.freq, nota.dur, "triangle", 0.075, 2800);
       tocarNotaSintetizada(nota.freq * 0.5, nota.dur, "square", 0.025, 1100);
     }, nota.delay);
@@ -373,7 +373,7 @@ function tocarMusiquinhaVitoriaFase() {
 
 function tocarSfxDerrota() {
   const audioCtx = garantirAudioContexto();
-  if (!audioCtx || !sistemaAudio.ativo) return;
+  if (!audioCtx) return;
 
   const notas = [293.66, 261.63, 220.0, 164.81];
   notas.forEach((freq, idx) => {
@@ -394,7 +394,7 @@ function pararMusicaFase() {
 
 function iniciarMusica(chaveFaixa) {
   const faixa = MUSICAS_POR_FASE[chaveFaixa];
-  if (!faixa || !sistemaAudio.ativo) {
+  if (!faixa || !sistemaAudio.musicaAtiva) {
     pararMusicaFase();
     return;
   }
@@ -414,7 +414,7 @@ function iniciarMusica(chaveFaixa) {
   const intervaloMs = duracaoPassoSeg * 1000;
 
   const executarPasso = () => {
-    if (!sistemaAudio.ativo) return;
+    if (!sistemaAudio.musicaAtiva) return;
     if (estadoJogo.status !== "lobby" && estadoJogo.status !== "jogando") return;
     if (!sistemaAudio.ctx || sistemaAudio.ctx.state !== "running") return;
 
@@ -483,9 +483,8 @@ function salvarProgresso() {
 const progressoInicial = carregarProgressoSalvo();
 
 const estadoJogo = {
-  // "press_key" | "intro" | "menu" | "lobby" | "jogando" | "vitoria_fase" | "derrota"
+  // "press_key" | "menu" | "lobby" | "jogando" | "vitoria_fase" | "derrota"
   status: "press_key",
-  introTimerId: null,
   maiorFaseDesbloqueada: progressoInicial.maiorFaseDesbloqueada,
   fasesConcluidas: progressoInicial.fasesConcluidas,
   faseNoNo: 0,
@@ -541,7 +540,7 @@ const soldado = {
 };
 
 // =========================================================
-// 3B. TELA CHEIA, TELA INICIAL, INTRODUÇÃO E MENU CENTRAL
+// 3B. TELA CHEIA, TELA INICIAL E MENU CENTRAL
 // =========================================================
 function solicitarTelaCheiaSePossivel() {
   const alvo = appTelaCheia || document.documentElement;
@@ -563,48 +562,27 @@ function alternarTelaCheia() {
 
 function esconderTodosOverlays() {
   overlayPressKey.classList.add("oculto");
-  overlayIntro.classList.add("oculto");
   overlayMenuPrincipal.classList.add("oculto");
   overlayFim.classList.add("oculto");
 }
 
-function limparTimerIntro() {
-  if (estadoJogo.introTimerId !== null) {
-    clearTimeout(estadoJogo.introTimerId);
-    estadoJogo.introTimerId = null;
-  }
-}
-
 function irParaTelaPressKey() {
-  limparTimerIntro();
   pararMusicaFase();
   estadoJogo.status = "press_key";
   esconderTodosOverlays();
   overlayPressKey.classList.remove("oculto");
   atualizarBarraLobbyUI();
-  atualizarHUD();
+  atualizarBotaoMusicaUI();
 }
 
-function iniciarIntroducaoJogo() {
+function irDiretoParaMenuAposTecla() {
   if (estadoJogo.status !== "press_key") return;
-  limparTimerIntro();
   solicitarTelaCheiaSePossivel();
   garantirAudioContexto();
-
-  estadoJogo.status = "intro";
-  esconderTodosOverlays();
-  overlayIntro.classList.remove("oculto");
-  atualizarBarraLobbyUI();
-
-  estadoJogo.introTimerId = setTimeout(() => {
-    if (estadoJogo.status === "intro") {
-      abrirMenuPrincipal("principal");
-    }
-  }, 1900);
+  abrirMenuPrincipal("principal");
 }
 
 function abrirMenuPrincipal(subtela = "principal") {
-  limparTimerIntro();
   pararMusicaFase();
   estadoJogo.status = "menu";
   esconderTodosOverlays();
@@ -628,11 +606,10 @@ function abrirMenuPrincipal(subtela = "principal") {
   }
 
   atualizarBarraLobbyUI();
-  atualizarHUD();
+  atualizarBotaoMusicaUI();
 }
 
 function sairDoJogo() {
-  limparTimerIntro();
   pararMusicaFase();
   try {
     window.close();
@@ -690,7 +667,6 @@ function posicionarSoldadoNoNoLobby(indiceNo) {
 }
 
 function abrirLobby(indiceInicial = estadoJogo.maiorFaseDesbloqueada) {
-  limparTimerIntro();
   const alvo = Math.max(0, Math.min(NOS_LOBBY.length - 1, indiceInicial));
   estadoJogo.status = "lobby";
   estadoJogo.cameraX = 0;
@@ -701,9 +677,9 @@ function abrirLobby(indiceInicial = estadoJogo.maiorFaseDesbloqueada) {
 
   esconderTodosOverlays();
   posicionarSoldadoNoNoLobby(alvo);
-  atualizarHUD();
+  atualizarBotaoMusicaUI();
 
-  if (sistemaAudio.ativo) {
+  if (sistemaAudio.musicaAtiva) {
     iniciarMusica("lobby");
   }
 }
@@ -716,7 +692,6 @@ function resetarProgressoLobby() {
   if (estadoJogo.status === "lobby") {
     posicionarSoldadoNoNoLobby(0);
   }
-  atualizarHUD();
 }
 
 function tentarEntrarNaFase(indice) {
@@ -797,7 +772,6 @@ function atualizarLobbyCuphead() {
 }
 
 function iniciarFase(indice) {
-  limparTimerIntro();
   garantirAudioContexto();
 
   const indiceValido = Math.max(0, Math.min(NIVEIS.length - 1, indice));
@@ -825,8 +799,8 @@ function iniciarFase(indice) {
 
   esconderTodosOverlays();
   atualizarBarraLobbyUI();
+  atualizarBotaoMusicaUI();
   carregarNivel(indiceValido);
-  atualizarHUD();
 }
 
 function carregarNivel(indice) {
@@ -1047,7 +1021,7 @@ function concluirFaseComVitoria(indiceFase) {
   const telaY = soldado.y + soldado.alturaAtual / 2;
   gerarParticulasVitoria(telaX, telaY);
   atualizarBarraLobbyUI();
-  atualizarHUD();
+  atualizarBotaoMusicaUI();
 }
 
 function atualizarAcaoVitoriaFase() {
@@ -1093,6 +1067,7 @@ function finalizarDerrota() {
   mensagemFim.textContent = "Sua energia chegou a zero. Tente novamente ou volte ao lobby.";
   pontuacaoFinalEl.textContent = estadoJogo.pontuacao;
   atualizarBarraLobbyUI();
+  atualizarBotaoMusicaUI();
   esconderTodosOverlays();
   overlayFim.classList.remove("oculto");
 }
@@ -1102,20 +1077,10 @@ function finalizarDerrota() {
 // =========================================================
 function registrarEventos() {
   overlayPressKey.addEventListener("click", function () {
-    iniciarIntroducaoJogo();
+    irDiretoParaMenuAposTecla();
   });
 
-  btnPularIntro.addEventListener("click", function () {
-    abrirMenuPrincipal("principal");
-  });
-
-  btnMenuRapido.addEventListener("click", function () {
-    if (estadoJogo.status === "menu") {
-      abrirLobby(estadoJogo.maiorFaseDesbloqueada);
-    } else if (estadoJogo.status !== "press_key" && estadoJogo.status !== "intro") {
-      abrirMenuPrincipal("principal");
-    }
-  });
+  btnLobbyMusica.addEventListener("click", alternarMusicaApenas);
 
   btnLobbyMenu.addEventListener("click", function () {
     abrirMenuPrincipal("principal");
@@ -1145,9 +1110,8 @@ function registrarEventos() {
     abrirMenuPrincipal("principal");
   });
 
-  btnOpcaoSom.addEventListener("click", alternarSom);
+  btnOpcaoMusica.addEventListener("click", alternarMusicaApenas);
   btnOpcaoFullscreen.addEventListener("click", alternarTelaCheia);
-  btnFullscreen.addEventListener("click", alternarTelaCheia);
 
   btnConfirmarSair.addEventListener("click", function () {
     sairDoJogo();
@@ -1170,37 +1134,23 @@ function registrarEventos() {
     btnResetProgresso.addEventListener("click", resetarProgressoLobby);
   }
 
-  if (btnSom) {
-    btnSom.addEventListener("click", alternarSom);
-  }
-
   canvas.addEventListener("click", function (evento) {
+    if (estadoJogo.status !== "lobby") return;
+
     const rect = canvas.getBoundingClientRect();
     const escalaX = canvas.width / rect.width;
     const escalaY = canvas.height / rect.height;
     const clickX = (evento.clientX - rect.left) * escalaX;
     const clickY = (evento.clientY - rect.top) * escalaY;
 
-    if (
-      clickX >= botaoSomCanvas.x &&
-      clickX <= botaoSomCanvas.x + botaoSomCanvas.largura &&
-      clickY >= botaoSomCanvas.y &&
-      clickY <= botaoSomCanvas.y + botaoSomCanvas.altura
-    ) {
-      alternarSom();
-      return;
-    }
-
-    if (estadoJogo.status === "lobby") {
-      garantirAudioContexto();
-      for (let i = 0; i < NOS_LOBBY.length; i++) {
-        const no = NOS_LOBBY[i];
-        const dist = Math.hypot(clickX - no.x, clickY - no.y);
-        if (dist <= no.raio + 10) {
-          posicionarSoldadoNoNoLobby(no.indice);
-          tentarEntrarNaFase(no.indice);
-          return;
-        }
+    garantirAudioContexto();
+    for (let i = 0; i < NOS_LOBBY.length; i++) {
+      const no = NOS_LOBBY[i];
+      const dist = Math.hypot(clickX - no.x, clickY - no.y);
+      if (dist <= no.raio + 10) {
+        posicionarSoldadoNoNoLobby(no.indice);
+        tentarEntrarNaFase(no.indice);
+        return;
       }
     }
   });
@@ -1213,17 +1163,7 @@ function registrarEventos() {
         evento.preventDefault();
       }
       if (!evento.repeat) {
-        iniciarIntroducaoJogo();
-      }
-      return;
-    }
-
-    if (estadoJogo.status === "intro") {
-      if (["Space", "Enter", "Escape"].includes(codigo)) {
-        evento.preventDefault();
-      }
-      if (!evento.repeat) {
-        abrirMenuPrincipal("principal");
+        irDiretoParaMenuAposTecla();
       }
       return;
     }
@@ -1251,8 +1191,8 @@ function registrarEventos() {
 
     teclas[codigo] = true;
 
-    if (codigo === "KeyM" && !evento.repeat) {
-      alternarSom();
+    if (codigo === "KeyM" && !evento.repeat && podeControlarMusica()) {
+      alternarMusicaApenas();
       return;
     }
 
@@ -2178,7 +2118,6 @@ function atualizarProjeteis() {
         estadoJogo.pontuacao += 1000;
         estadoJogo.boss = null;
         estadoJogo.tirosInimigos = [];
-        atualizarHUD();
         concluirFaseComVitoria(estadoJogo.nivelIndice);
         return;
       }
@@ -2291,7 +2230,6 @@ function aplicarDanoSoldado(dano, direcaoImpacto = -1) {
   }
 
   if (soldado.vida <= 0) {
-    atualizarHUD();
     finalizarDerrota();
   }
 }
@@ -2309,57 +2247,33 @@ function colidiu(a, b) {
 }
 
 // =========================================================
-// 9. ATUALIZAÇÃO DO DOM (HUD) E RENDERIZAÇÃO NO CANVAS
+// 9. RENDERIZAÇÃO NO CANVAS (INCLUINDO HUD DENTRO DO CANVAS)
 // =========================================================
-function atualizarHUD() {
-  const indiceReferencia =
-    estadoJogo.status === "lobby"
-      ? estadoJogo.faseNoNo >= 0
-        ? estadoJogo.faseNoNo
-        : estadoJogo.maiorFaseDesbloqueada
-      : estadoJogo.nivelIndice;
-  const configNivel = NIVEIS[indiceReferencia] || NIVEIS[0];
+function desenharHudNoCanvas(configNivel) {
+  const pct =
+    configNivel.numero < NIVEIS.length
+      ? Math.min(100, Math.floor((soldado.x / (configNivel.distanciaMeta - 40)) * 100))
+      : estadoJogo.boss
+      ? 50
+      : 100;
 
-  hudNivel.textContent = `${configNivel.numero} / ${NIVEIS.length}`;
-  hudVida.textContent = soldado.vida;
-  hudPontos.textContent = estadoJogo.pontuacao;
-
-  if (estadoJogo.status === "lobby" || estadoJogo.status === "menu" || estadoJogo.status === "press_key" || estadoJogo.status === "intro") {
-    const pctDesbloqueio = Math.round(
-      (estadoJogo.fasesConcluidas.length / NIVEIS.length) * 100
-    );
-    hudProgresso.textContent = `${pctDesbloqueio}%`;
-    return;
-  }
-
-  if (configNivel.numero < NIVEIS.length) {
-    const pct = Math.min(100, Math.floor((soldado.x / (configNivel.distanciaMeta - 40)) * 100));
-    hudProgresso.textContent = `${pct}%`;
-  } else {
-    hudProgresso.textContent = estadoJogo.boss ? "BOSS!" : "100%";
-  }
-}
-
-function desenharBotaoSomCanvas() {
-  const b = botaoSomCanvas;
   ctx.save();
-  ctx.fillStyle = "rgba(15, 23, 42, 0.72)";
-  ctx.strokeStyle = sistemaAudio.ativo ? "#f0b429" : "#64748b";
+  ctx.fillStyle = "rgba(15, 23, 42, 0.78)";
+  ctx.strokeStyle = "#2f3e52";
   ctx.lineWidth = 1.5;
-
   ctx.beginPath();
-  ctx.roundRect(b.x, b.y, b.largura, b.altura, 6);
+  ctx.roundRect(14, 12, 390, 28, 6);
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = sistemaAudio.ativo ? "#f8fafc" : "#94a3b8";
+  ctx.fillStyle = "#e6edf3";
   ctx.font = "bold 12px Segoe UI, sans-serif";
-  ctx.textAlign = "center";
+  ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.fillText(
-    sistemaAudio.ativo ? "🔊 Som (M)" : "🔇 Mudo (M)",
-    b.x + b.largura / 2,
-    b.y + b.altura / 2
+    `FASE ${configNivel.numero}/3   |   VIDA ${soldado.vida}   |   PONTOS ${estadoJogo.pontuacao}   |   ${pct}%`,
+    24,
+    26
   );
   ctx.restore();
 }
@@ -2515,8 +2429,6 @@ function desenharMapaLobbyCuphead() {
     ctx.fillText("Fase bloqueada! Conclua a fase anterior para abrir.", canvas.width / 2, 74);
     ctx.restore();
   }
-
-  desenharBotaoSomCanvas();
 }
 
 function desenharAcaoVitoriaOverlay() {
@@ -2561,7 +2473,7 @@ function desenharAcaoVitoriaOverlay() {
   ctx.restore();
 }
 
-function desenharEntradaCaverna(xBase, configNivel) {
+function desenharEntradaCaverna(xBase) {
   const baseX = xBase - 38;
   const chao = CHAO_Y;
   const oscilacaoChama = Math.sin(estadoJogo.frameAtual * 0.35);
@@ -3363,11 +3275,7 @@ function desenharCena() {
     return;
   }
 
-  if (
-    estadoJogo.status === "press_key" ||
-    estadoJogo.status === "intro" ||
-    estadoJogo.status === "menu"
-  ) {
+  if (estadoJogo.status === "press_key" || estadoJogo.status === "menu") {
     ctx.fillStyle = "#11161d";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     return;
@@ -3398,7 +3306,7 @@ function desenharCena() {
   desenharPlataformas(configNivel);
 
   if (configNivel.numero < NIVEIS.length) {
-    desenharEntradaCaverna(configNivel.distanciaMeta, configNivel);
+    desenharEntradaCaverna(configNivel.distanciaMeta);
   }
 
   const piscando =
@@ -3502,8 +3410,8 @@ function desenharCena() {
     ctx.textAlign = "start";
   }
 
+  desenharHudNoCanvas(configNivel);
   desenharAcaoVitoriaOverlay();
-  desenharBotaoSomCanvas();
 }
 
 // =========================================================
@@ -3513,7 +3421,6 @@ function loopPrincipal() {
   if (estadoJogo.status === "lobby") {
     estadoJogo.frameAtual++;
     atualizarLobbyCuphead();
-    atualizarHUD();
   } else if (estadoJogo.status === "jogando") {
     estadoJogo.frameAtual++;
     atualizarPlataformas();
@@ -3525,7 +3432,6 @@ function loopPrincipal() {
     atualizarBoss();
     atualizarProjeteis();
     atualizarParticulasDano();
-    atualizarHUD();
   } else if (estadoJogo.status === "vitoria_fase") {
     estadoJogo.frameAtual++;
     atualizarAcaoVitoriaFase();
@@ -3537,6 +3443,6 @@ function loopPrincipal() {
 
 // Inicialização ao carregar o script
 registrarEventos();
-atualizarBotaoSomUI();
+atualizarBotaoMusicaUI();
 irParaTelaPressKey();
 loopPrincipal();
