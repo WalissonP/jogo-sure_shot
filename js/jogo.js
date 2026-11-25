@@ -98,6 +98,7 @@ const estadoJogo = {
   itensChao: [],
   inimigos: [],
   particulasDano: [],
+  efeitosImpacto: [],
   tirosJogador: [],
   tirosInimigos: [],
   boss: null
@@ -138,6 +139,7 @@ function iniciarPartida() {
   estadoJogo.pulsoTelaDano = 0;
   estadoJogo.inclinacaoDano = 0;
   estadoJogo.particulasDano = [];
+  estadoJogo.efeitosImpacto = [];
   estadoJogo.buracosChao = [];
   estadoJogo.caminhosSubterraneos = [];
 
@@ -165,6 +167,7 @@ function carregarNivel(indice) {
   estadoJogo.caminhosSubterraneos = [];
   estadoJogo.itensChao = [];
   estadoJogo.particulasDano = [];
+  estadoJogo.efeitosImpacto = [];
   estadoJogo.tirosJogador = [];
   estadoJogo.tirosInimigos = [];
   estadoJogo.boss = null;
@@ -921,7 +924,6 @@ function atualizarInimigos() {
         const obsAFrente = encontrarObstaculoAFrente(inimigo, inimigo.direcaoOlhar);
 
         if (obsAFrente) {
-          // Salta formando um "U" invertido com o corpo até mergulhar de cabeça antes do obstáculo
           inimigo.estado = "saltando_mergulho";
           inimigo.obstaculoAlvo = obsAFrente;
           inimigo.ocultoNaTerra = false;
@@ -971,7 +973,6 @@ function atualizarInimigos() {
           });
         }
 
-        // Só oculta totalmente quando a cauda (último ponto do rastro) também já entrou em CHAO_Y
         const ultimoPonto =
           inimigo.rastroPulo[Math.min(inimigo.rastroPulo.length - 1, 24)] ||
           obterPosicaoCabecaRastejador(inimigo);
@@ -1143,11 +1144,90 @@ function atualizarBoss() {
 // =========================================================
 // 8. PROJÉTEIS, PARTÍCULAS DE DANO E COLISÕES
 // =========================================================
+function encontrarObstaculoBloqueadorTiro(tiro) {
+  for (let i = 0; i < estadoJogo.obstaculos.length; i++) {
+    if (colidiu(tiro, estadoJogo.obstaculos[i])) {
+      return estadoJogo.obstaculos[i];
+    }
+  }
+
+  for (let i = 0; i < estadoJogo.estruturasQuebradas.length; i++) {
+    const blocoAlto = obterBlocoPassagemBaixa(estadoJogo.estruturasQuebradas[i]);
+    if (colidiu(tiro, blocoAlto)) {
+      return blocoAlto;
+    }
+  }
+
+  for (let i = 0; i < estadoJogo.plataformas.length; i++) {
+    const plat = estadoJogo.plataformas[i];
+    if (plat.desmoronando) continue;
+    if (colidiu(tiro, plat)) {
+      return plat;
+    }
+  }
+
+  return null;
+}
+
+function criarAnimacaoBalaPocando(tiro, bloco, corBase = "#ffd43b") {
+  let px = tiro.x + tiro.largura / 2;
+  let py = tiro.y + tiro.altura / 2;
+  let normalX = 0;
+  let normalY = -1;
+
+  if (tiro.vx > 0) {
+    px = bloco.x;
+    normalX = -1;
+    normalY = -0.35;
+  } else if (tiro.vx < 0) {
+    px = bloco.x + bloco.largura;
+    normalX = 1;
+    normalY = -0.35;
+  } else if (tiro.vy < 0) {
+    py = bloco.y + bloco.altura;
+    normalX = 0;
+    normalY = 1;
+  }
+
+  estadoJogo.efeitosImpacto.push({
+    x: px,
+    y: py,
+    raioInicial: 3,
+    raioMax: 13,
+    vida: 8,
+    vidaMax: 8,
+    cor: corBase
+  });
+
+  const anguloBase = Math.atan2(normalY, normalX);
+  for (let k = 0; k < 7; k++) {
+    const dispersao = (Math.random() - 0.5) * 1.35;
+    const angulo = anguloBase + dispersao;
+    const velocidade = 1.6 + Math.random() * 2.8;
+    estadoJogo.particulasDano.push({
+      x: px,
+      y: py,
+      vx: Math.cos(angulo) * velocidade,
+      vy: Math.sin(angulo) * velocidade - 1.2,
+      vida: 9 + Math.floor(Math.random() * 6),
+      tamanho: 2 + Math.random() * 2,
+      cor: k % 2 === 0 ? corBase : "#fff3bf"
+    });
+  }
+}
+
 function atualizarProjeteis() {
   for (let i = estadoJogo.tirosJogador.length - 1; i >= 0; i--) {
     const tiro = estadoJogo.tirosJogador[i];
     tiro.x += tiro.vx;
     tiro.y += tiro.vy;
+
+    const obstaculoBloqueador = encontrarObstaculoBloqueadorTiro(tiro);
+    if (obstaculoBloqueador) {
+      criarAnimacaoBalaPocando(tiro, obstaculoBloqueador, "#ffd43b");
+      estadoJogo.tirosJogador.splice(i, 1);
+      continue;
+    }
 
     let acertou = false;
 
@@ -1201,6 +1281,13 @@ function atualizarProjeteis() {
     tiro.x += tiro.vx;
     tiro.y += tiro.vy;
 
+    const obstaculoBloqueador = encontrarObstaculoBloqueadorTiro(tiro);
+    if (obstaculoBloqueador) {
+      criarAnimacaoBalaPocando(tiro, obstaculoBloqueador, "#ff8787");
+      estadoJogo.tirosInimigos.splice(i, 1);
+      continue;
+    }
+
     const hitboxSoldado = {
       x: soldado.x,
       y: soldado.y,
@@ -1229,6 +1316,14 @@ function atualizarParticulasDano() {
     estadoJogo.pulsoTelaDano--;
   }
   estadoJogo.inclinacaoDano *= 0.82;
+
+  for (let i = estadoJogo.efeitosImpacto.length - 1; i >= 0; i--) {
+    const fx = estadoJogo.efeitosImpacto[i];
+    fx.vida--;
+    if (fx.vida <= 0) {
+      estadoJogo.efeitosImpacto.splice(i, 1);
+    }
+  }
 
   for (let i = estadoJogo.particulasDano.length - 1; i >= 0; i--) {
     const p = estadoJogo.particulasDano[i];
@@ -1320,7 +1415,6 @@ function desenharCaminhosSubterraneos() {
     ctx.save();
     ctx.globalAlpha = alfa;
 
-    // 1. Caminho curvo em "U" dentro da terra
     ctx.strokeStyle = "#140d07";
     ctx.lineWidth = 11;
     ctx.lineCap = "round";
@@ -1345,7 +1439,6 @@ function desenharCaminhosSubterraneos() {
     }
     ctx.stroke();
 
-    // 2. Rastro de terra escavada tipo formigueiro na superfície do solo
     const centroFormigueiroX = (cam.xEntrada + cam.xSaida) / 2;
     const visibilidadeMonticulos = Math.min(1, maxT * 1.4);
 
@@ -1360,7 +1453,6 @@ function desenharCaminhosSubterraneos() {
       ctx.fill();
     }
 
-    // 3. Terra revolvida avançando junto com o ponto atual do "U"
     if (cam.ativo) {
       const ponta = calcularPontoCurvaU(cam, cam.progressoU);
       const tremor = Math.sin(estadoJogo.frameAtual * 0.55) * 1.8;
@@ -1605,7 +1697,6 @@ function desenharRastejadorAlien(inimigo) {
 
   ctx.save();
 
-  // Durante o salto em arco e o mergulho, cada segmento segue a parábola formando um "U" de cabeça para baixo
   if ((saltandoMergulho || mergulhando) && inimigo.rastroPulo.length > 0) {
     ctx.beginPath();
     ctx.rect(
@@ -1640,7 +1731,6 @@ function desenharRastejadorAlien(inimigo) {
       ctx.arc(pt.x + tremorDano, pt.y, raio, 0, Math.PI * 2);
       ctx.fill();
 
-      // Espinho dorsal acompanhando a curvatura do "U" invertido
       ctx.fillStyle = emDano ? "#ffd43b" : "#c8553d";
       ctx.beginPath();
       ctx.moveTo(
@@ -1659,7 +1749,6 @@ function desenharRastejadorAlien(inimigo) {
       ctx.fill();
     }
 
-    // Cabeça na ponta frontal do arco mergulhando
     const ptCabeca = inimigo.rastroPulo[0];
     const anguloCabeca = Math.atan2(ptCabeca.vy, ptCabeca.vx);
 
@@ -1967,6 +2056,25 @@ function desenharCena() {
 
   if (!piscando || estadoJogo.danoSoldadoFrames > 0) {
     desenharSoldado();
+  }
+
+  for (let i = 0; i < estadoJogo.efeitosImpacto.length; i++) {
+    const fx = estadoJogo.efeitosImpacto[i];
+    const progresso = 1 - fx.vida / fx.vidaMax;
+    const raio = fx.raioInicial + (fx.raioMax - fx.raioInicial) * progresso;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, fx.vida / fx.vidaMax);
+    ctx.strokeStyle = fx.cor;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, raio, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = "#fff9db";
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, Math.max(1.5, raio * 0.35), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   for (let i = 0; i < estadoJogo.particulasDano.length; i++) {
