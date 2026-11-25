@@ -9,22 +9,26 @@ const hudVida = document.querySelector("#hud-vida");
 const hudPontos = document.querySelector("#hud-pontos");
 const hudProgresso = document.querySelector("#hud-progresso");
 
-const overlayInicio = document.querySelector("#overlay-inicio");
+const barraLobby = document.querySelector("#barra-lobby");
+const statusLobbyTexto = document.querySelector("#status-lobby-texto");
+const btnResetProgresso = document.querySelector("#btn-reset-progresso");
+
 const overlayFim = document.querySelector("#overlay-fim");
 const tituloFim = document.querySelector("#titulo-fim");
 const mensagemFim = document.querySelector("#mensagem-fim");
 const pontuacaoFinalEl = document.querySelector("#pontuacao-final");
 
-const btnIniciar = document.querySelector("#btn-iniciar");
 const btnReiniciar = document.querySelector("#btn-reiniciar");
+const btnVoltarLobby = document.querySelector("#btn-voltar-lobby");
 const btnSom = document.querySelector("#btn-som");
 
 // =========================================================
-// 2. CONFIGURAÇÃO DOS 5 NÍVEIS E EVOLUÇÃO DOS INIMIGOS
+// 2. CONFIGURAÇÃO DOS 3 NÍVEIS E MAPA ESTILO CUPHEAD
 // =========================================================
 const CHAO_Y = 380;
 const GRAVIDADE = 0.65;
 const FPS_ESTIMADO = 60;
+const CHAVE_PROGRESSO_STORAGE = "operacao_vanguarda_progresso_3fases_v1";
 
 const NIVEIS = [
   {
@@ -41,43 +45,72 @@ const NIVEIS = [
     nome: "Setor 2 - Trincheiras",
     corCeu: "#1f2937",
     corChao: "#3f3a2c",
-    distanciaMeta: 2600,
-    intervaloSpawn: 95,
-    tiposInimigos: ["rastejador", "saltador"]
+    distanciaMeta: 2800,
+    intervaloSpawn: 85,
+    tiposInimigos: ["rastejador", "saltador", "atirador", "drone"]
   },
   {
     numero: 3,
-    nome: "Setor 3 - Base Aérea",
-    corCeu: "#231f38",
-    corChao: "#353148",
-    distanciaMeta: 3000,
-    intervaloSpawn: 85,
-    tiposInimigos: ["saltador", "atirador", "drone"]
-  },
-  {
-    numero: 4,
-    nome: "Setor 4 - Fortaleza",
-    corCeu: "#331c24",
-    corChao: "#42272e",
-    distanciaMeta: 3400,
-    intervaloSpawn: 75,
-    tiposInimigos: ["atirador", "drone", "blindado"]
-  },
-  {
-    numero: 5,
-    nome: "Setor 5 - Núcleo do Boss",
+    nome: "Setor 3 - Núcleo do Boss",
     corCeu: "#2b1215",
     corChao: "#3b1d22",
     distanciaMeta: 900,
-    intervaloSpawn: 150,
-    tiposInimigos: ["drone"]
+    intervaloSpawn: 140,
+    tiposInimigos: ["drone", "atirador"]
+  }
+];
+
+const NOS_LOBBY = [
+  {
+    indice: 0,
+    rotuloCurto: "FASE 1",
+    titulo: "Ruínas",
+    subtitulo: "Rastejadores e escombros",
+    x: 185,
+    y: 265,
+    raio: 28,
+    corPonto: "#f0b429"
+  },
+  {
+    indice: 1,
+    rotuloCurto: "FASE 2",
+    titulo: "Trincheiras",
+    subtitulo: "Saltadores, atiradores e drones",
+    x: 455,
+    y: 195,
+    raio: 28,
+    corPonto: "#38bdf8"
+  },
+  {
+    indice: 2,
+    rotuloCurto: "BOSS",
+    titulo: "Núcleo do Boss",
+    subtitulo: "Confronto final contra o Boss",
+    x: 725,
+    y: 265,
+    raio: 32,
+    corPonto: "#fa5252"
   }
 ];
 
 // =========================================================
-// 2B. TRILHA SONORA PROCEDURAL POR FASE E EFEITOS SONOROS (WEB AUDIO API)
+// 2B. TRILHA SONORA PROCEDURAL, FANFARRA DE VITÓRIA E SFX
 // =========================================================
 const MUSICAS_POR_FASE = {
+  lobby: {
+    bpm: 116,
+    ondaMelodia: "triangle",
+    ondaBaixo: "sine",
+    volume: 0.042,
+    melodia: [
+      392.0, 0, 440.0, 493.88, 587.33, 0, 493.88, 440.0,
+      392.0, 0, 329.63, 392.0, 440.0, 392.0, 329.63, 0
+    ],
+    baixo: [
+      98.0, 0, 98.0, 0, 146.83, 0, 146.83, 0,
+      82.41, 0, 82.41, 0, 110.0, 0, 98.0, 0
+    ]
+  },
   1: {
     bpm: 108,
     ondaMelodia: "triangle",
@@ -93,7 +126,7 @@ const MUSICAS_POR_FASE = {
     ]
   },
   2: {
-    bpm: 124,
+    bpm: 132,
     ondaMelodia: "square",
     ondaBaixo: "triangle",
     volume: 0.04,
@@ -107,34 +140,6 @@ const MUSICAS_POR_FASE = {
     ]
   },
   3: {
-    bpm: 134,
-    ondaMelodia: "sawtooth",
-    ondaBaixo: "square",
-    volume: 0.036,
-    melodia: [
-      440.0, 523.25, 659.25, 523.25, 587.33, 698.46, 587.33, 440.0,
-      493.88, 587.33, 783.99, 587.33, 659.25, 523.25, 440.0, 392.0
-    ],
-    baixo: [
-      110.0, 110.0, 130.81, 130.81, 146.83, 146.83, 110.0, 110.0,
-      123.47, 123.47, 146.83, 146.83, 130.81, 130.81, 98.0, 98.0
-    ]
-  },
-  4: {
-    bpm: 142,
-    ondaMelodia: "square",
-    ondaBaixo: "sawtooth",
-    volume: 0.042,
-    melodia: [
-      369.99, 0, 440.0, 554.37, 493.88, 440.0, 369.99, 329.63,
-      369.99, 440.0, 587.33, 554.37, 493.88, 369.99, 329.63, 277.18
-    ],
-    baixo: [
-      92.5, 92.5, 92.5, 110.0, 92.5, 92.5, 82.41, 73.42,
-      92.5, 92.5, 123.47, 110.0, 92.5, 82.41, 73.42, 69.3
-    ]
-  },
-  5: {
     bpm: 152,
     ondaMelodia: "sawtooth",
     ondaBaixo: "square",
@@ -154,7 +159,7 @@ const sistemaAudio = {
   ctx: null,
   timerId: null,
   passoAtual: 0,
-  faseAtiva: null,
+  faixaAtiva: null,
   ativo: true
 };
 
@@ -178,9 +183,11 @@ function alternarSom() {
     pararMusicaFase();
   } else {
     garantirAudioContexto();
-    if (estadoJogo.status === "jogando") {
+    if (estadoJogo.status === "lobby") {
+      iniciarMusica("lobby");
+    } else if (estadoJogo.status === "jogando") {
       const configNivel = NIVEIS[estadoJogo.nivelIndice];
-      iniciarMusicaFase(configNivel.numero);
+      iniciarMusica(configNivel.numero);
     }
   }
 }
@@ -313,11 +320,34 @@ function tocarSfxAcertoInimigo(eliminado = false) {
   osc.stop(agora + (eliminado ? 0.18 : 0.07));
 }
 
-function tocarSfxFimPartida(venceu) {
+function tocarMusiquinhaVitoriaFase() {
   const audioCtx = garantirAudioContexto();
   if (!audioCtx || !sistemaAudio.ativo) return;
 
-  const notas = venceu ? [392.0, 493.88, 587.33, 783.99] : [293.66, 261.63, 220.0, 164.81];
+  // Fanfarra animada estilo arcade ao concluir uma fase e voltar ao lobby
+  const sequencia = [
+    { freq: 523.25, delay: 0, dur: 0.12 },     // C5
+    { freq: 659.25, delay: 110, dur: 0.12 },   // E5
+    { freq: 783.99, delay: 220, dur: 0.12 },   // G5
+    { freq: 1046.5, delay: 340, dur: 0.22 },   // C6
+    { freq: 880.0, delay: 560, dur: 0.12 },    // A5
+    { freq: 1046.5, delay: 690, dur: 0.36 }    // C6 final
+  ];
+
+  sequencia.forEach((nota) => {
+    setTimeout(() => {
+      if (!sistemaAudio.ativo || !sistemaAudio.ctx) return;
+      tocarNotaSintetizada(nota.freq, nota.dur, "triangle", 0.075, 2800);
+      tocarNotaSintetizada(nota.freq * 0.5, nota.dur, "square", 0.025, 1100);
+    }, nota.delay);
+  });
+}
+
+function tocarSfxDerrota() {
+  const audioCtx = garantirAudioContexto();
+  if (!audioCtx || !sistemaAudio.ativo) return;
+
+  const notas = [293.66, 261.63, 220.0, 164.81];
   notas.forEach((freq, idx) => {
     setTimeout(() => {
       tocarNotaSintetizada(freq, 0.22, "triangle", 0.065, 2400);
@@ -330,12 +360,12 @@ function pararMusicaFase() {
     clearInterval(sistemaAudio.timerId);
     sistemaAudio.timerId = null;
   }
-  sistemaAudio.faseAtiva = null;
+  sistemaAudio.faixaAtiva = null;
   sistemaAudio.passoAtual = 0;
 }
 
-function iniciarMusicaFase(numeroFase) {
-  const faixa = MUSICAS_POR_FASE[numeroFase];
+function iniciarMusica(chaveFaixa) {
+  const faixa = MUSICAS_POR_FASE[chaveFaixa];
   if (!faixa || !sistemaAudio.ativo) {
     pararMusicaFase();
     return;
@@ -344,19 +374,20 @@ function iniciarMusicaFase(numeroFase) {
   const audioCtx = garantirAudioContexto();
   if (!audioCtx) return;
 
-  if (sistemaAudio.faseAtiva === numeroFase && sistemaAudio.timerId !== null) {
+  if (sistemaAudio.faixaAtiva === chaveFaixa && sistemaAudio.timerId !== null) {
     return;
   }
 
   pararMusicaFase();
-  sistemaAudio.faseAtiva = numeroFase;
+  sistemaAudio.faixaAtiva = chaveFaixa;
   sistemaAudio.passoAtual = 0;
 
   const duracaoPassoSeg = 60 / faixa.bpm / 4;
   const intervaloMs = duracaoPassoSeg * 1000;
 
   const executarPasso = () => {
-    if (estadoJogo.status !== "jogando" || !sistemaAudio.ativo) return;
+    if (!sistemaAudio.ativo) return;
+    if (estadoJogo.status !== "lobby" && estadoJogo.status !== "jogando") return;
     if (!sistemaAudio.ctx || sistemaAudio.ctx.state !== "running") return;
 
     const idx = sistemaAudio.passoAtual % faixa.melodia.length;
@@ -386,12 +417,54 @@ function iniciarMusicaFase(numeroFase) {
 }
 
 // =========================================================
-// 3. ESTADO DO JOGO (OBJETOS E ARRAYS)
+// 3. ESTADO DO JOGO (LOBBY, DESBLOQUEIO, COMBATE E VITÓRIA)
 // =========================================================
 const teclas = {};
 
+function carregarProgressoSalvo() {
+  try {
+    const bruto = localStorage.getItem(CHAVE_PROGRESSO_STORAGE);
+    if (!bruto) {
+      return { maiorFaseDesbloqueada: 0, fasesConcluidas: [] };
+    }
+    const parsed = JSON.parse(bruto);
+    const maior = Math.max(0, Math.min(NIVEIS.length - 1, Number(parsed.maiorFaseDesbloqueada) || 0));
+    const concluidas = Array.isArray(parsed.fasesConcluidas)
+      ? parsed.fasesConcluidas.filter((n) => Number.isInteger(n) && n >= 0 && n < NIVEIS.length)
+      : [];
+    return { maiorFaseDesbloqueada: maior, fasesConcluidas: concluidas };
+  } catch {
+    return { maiorFaseDesbloqueada: 0, fasesConcluidas: [] };
+  }
+}
+
+function salvarProgresso() {
+  try {
+    localStorage.setItem(
+      CHAVE_PROGRESSO_STORAGE,
+      JSON.stringify({
+        maiorFaseDesbloqueada: estadoJogo.maiorFaseDesbloqueada,
+        fasesConcluidas: estadoJogo.fasesConcluidas
+      })
+    );
+  } catch {
+    // Ignora falha de armazenamento se bloqueado pelo navegador
+  }
+}
+
+const progressoInicial = carregarProgressoSalvo();
+
 const estadoJogo = {
-  status: "menu", // "menu" | "jogando" | "vitoria" | "derrota"
+  status: "lobby", // "lobby" | "jogando" | "vitoria_fase" | "derrota" | "campanha_concluida"
+  maiorFaseDesbloqueada: progressoInicial.maiorFaseDesbloqueada,
+  fasesConcluidas: progressoInicial.fasesConcluidas,
+  faseNoNo: 0,
+  mensagemBloqueioFrames: 0,
+  vitoriaTimerFrames: 0,
+  vitoriaFaseConcluidaIndice: 0,
+  vitoriaCampanhaCompleta: false,
+  particulasVitoria: [],
+
   nivelIndice: 0,
   pontuacao: 0,
   cameraX: 0,
@@ -417,8 +490,8 @@ const estadoJogo = {
 };
 
 const soldado = {
-  x: 120,
-  y: CHAO_Y - 56,
+  x: NOS_LOBBY[0].x,
+  y: NOS_LOBBY[0].y - 18,
   larguraEmPe: 34,
   larguraDeitado: 52,
   largura: 34,
@@ -438,14 +511,165 @@ const soldado = {
 };
 
 // =========================================================
-// 4. INICIALIZAÇÃO, NÍVEIS E REINÍCIO
+// 4. LOBBY ESTILO CUPHEAD, DESBLOQUEIO E AÇÃO DE VITÓRIA
 // =========================================================
-function iniciarPartida() {
+function faseEstaDesbloqueada(indice) {
+  return indice <= estadoJogo.maiorFaseDesbloqueada;
+}
+
+function faseEstaConcluida(indice) {
+  return estadoJogo.fasesConcluidas.includes(indice);
+}
+
+function atualizarBarraLobbyUI() {
+  if (!barraLobby) return;
+  if (estadoJogo.status !== "lobby") {
+    barraLobby.classList.add("oculto");
+    return;
+  }
+
+  barraLobby.classList.remove("oculto");
+  const noAtual = NOS_LOBBY[estadoJogo.faseNoNo];
+  if (noAtual) {
+    if (faseEstaDesbloqueada(noAtual.indice)) {
+      const statusTag = faseEstaConcluida(noAtual.indice) ? "Concluída" : "Desbloqueada";
+      statusLobbyTexto.textContent = `Sobre ${noAtual.rotuloCurto} - ${noAtual.titulo} (${statusTag}) • Enter/Espaço para jogar`;
+    } else {
+      statusLobbyTexto.textContent = `Sobre ${noAtual.rotuloCurto} - ${noAtual.titulo} (Bloqueada: conclua a fase anterior)`;
+    }
+  } else {
+    statusLobbyTexto.textContent = "Andando pelo mapa do lobby • Pare em cima de uma fase desbloqueada";
+  }
+}
+
+function posicionarSoldadoNoNoLobby(indiceNo) {
+  const no = NOS_LOBBY[indiceNo] || NOS_LOBBY[0];
+  soldado.deitado = false;
+  soldado.olhandoCima = false;
+  soldado.largura = soldado.larguraEmPe;
+  soldado.alturaAtual = soldado.alturaEmPe;
+  soldado.x = no.x - soldado.largura / 2;
+  soldado.y = no.y - soldado.alturaEmPe + 4;
+  soldado.vx = 0;
+  soldado.vy = 0;
+  soldado.noChao = true;
+  estadoJogo.faseNoNo = no.indice;
+  atualizarBarraLobbyUI();
+}
+
+function abrirLobby(indiceInicial = estadoJogo.maiorFaseDesbloqueada) {
+  const alvo = Math.max(0, Math.min(NOS_LOBBY.length - 1, indiceInicial));
+  estadoJogo.status = "lobby";
+  estadoJogo.cameraX = 0;
+  estadoJogo.particulasDano = [];
+  estadoJogo.efeitosImpacto = [];
+  estadoJogo.tirosJogador = [];
+  estadoJogo.tirosInimigos = [];
+
+  overlayFim.classList.add("oculto");
+  posicionarSoldadoNoNoLobby(alvo);
+  atualizarHUD();
+
+  if (sistemaAudio.ativo) {
+    iniciarMusica("lobby");
+  }
+}
+
+function resetarProgressoLobby() {
+  estadoJogo.maiorFaseDesbloqueada = 0;
+  estadoJogo.fasesConcluidas = [];
+  estadoJogo.pontuacao = 0;
+  salvarProgresso();
+  abrirLobby(0);
+}
+
+function tentarEntrarNaFase(indice) {
+  if (!faseEstaDesbloqueada(indice)) {
+    estadoJogo.mensagemBloqueioFrames = 95;
+    atualizarBarraLobbyUI();
+    return;
+  }
+  iniciarFase(indice);
+}
+
+function atualizarLobbyCuphead() {
+  const esquerda = teclas["KeyA"] || teclas["ArrowLeft"];
+  const direita = teclas["KeyD"] || teclas["ArrowRight"];
+  const cima = teclas["KeyW"] || teclas["ArrowUp"];
+  const baixo = teclas["KeyS"] || teclas["ArrowDown"];
+
+  if (estadoJogo.mensagemBloqueioFrames > 0) {
+    estadoJogo.mensagemBloqueioFrames--;
+  }
+
+  let movendoX = 0;
+  let movendoY = 0;
+
+  if (esquerda && !direita) {
+    movendoX = -1;
+    soldado.direcao = -1;
+  } else if (direita && !esquerda) {
+    movendoX = 1;
+    soldado.direcao = 1;
+  }
+
+  if (cima && !baixo) {
+    movendoY = -1;
+  } else if (baixo && !cima) {
+    movendoY = 1;
+  }
+
+  const velLobby = 3.8;
+  soldado.vx = movendoX * velLobby;
+  soldado.vy = movendoY * velLobby;
+
+  if (movendoX !== 0 || movendoY !== 0) {
+    const centroX = soldado.x + soldado.largura / 2 + soldado.vx;
+    const baseY = soldado.y + soldado.alturaAtual + soldado.vy;
+
+    const xLimitado = Math.max(85, Math.min(canvas.width - 85, centroX));
+    const yLimitado = Math.max(155, Math.min(365, baseY));
+
+    soldado.x = xLimitado - soldado.largura / 2;
+    soldado.y = yLimitado - soldado.alturaAtual;
+  }
+
+  // Verifica se o soldado está em cima de algum nó de fase no mapa
+  const peX = soldado.x + soldado.largura / 2;
+  const peY = soldado.y + soldado.alturaAtual;
+  let noEncontrado = null;
+
+  for (let i = 0; i < NOS_LOBBY.length; i++) {
+    const no = NOS_LOBBY[i];
+    const dist = Math.hypot(peX - no.x, peY - no.y);
+    if (dist <= no.raio + 16) {
+      noEncontrado = no;
+      // Encaixe suave quando para em cima da fase
+      if (movendoX === 0 && movendoY === 0 && dist > 3) {
+        const alvoX = no.x - soldado.largura / 2;
+        const alvoY = no.y - soldado.alturaAtual + 4;
+        soldado.x += (alvoX - soldado.x) * 0.25;
+        soldado.y += (alvoY - soldado.y) * 0.25;
+      }
+      break;
+    }
+  }
+
+  const novoNoIndice = noEncontrado ? noEncontrado.indice : -1;
+  if (novoNoIndice !== estadoJogo.faseNoNo) {
+    estadoJogo.faseNoNo = novoNoIndice;
+    atualizarBarraLobbyUI();
+  }
+}
+
+function iniciarFase(indice) {
   garantirAudioContexto();
 
+  const indiceValido = Math.max(0, Math.min(NIVEIS.length - 1, indice));
+  if (!faseEstaDesbloqueada(indiceValido)) return;
+
   estadoJogo.status = "jogando";
-  estadoJogo.nivelIndice = 0;
-  estadoJogo.pontuacao = 0;
+  estadoJogo.nivelIndice = indiceValido;
   estadoJogo.frameAtual = 0;
   estadoJogo.ultimoTiroFrame = 0;
   estadoJogo.invulneravelAte = 0;
@@ -454,6 +678,7 @@ function iniciarPartida() {
   estadoJogo.inclinacaoDano = 0;
   estadoJogo.particulasDano = [];
   estadoJogo.efeitosImpacto = [];
+  estadoJogo.particulasVitoria = [];
   estadoJogo.buracosChao = [];
   estadoJogo.caminhosSubterraneos = [];
 
@@ -463,10 +688,9 @@ function iniciarPartida() {
   soldado.largura = soldado.larguraEmPe;
   soldado.alturaAtual = soldado.alturaEmPe;
 
-  overlayInicio.classList.add("oculto");
   overlayFim.classList.add("oculto");
-
-  carregarNivel(0);
+  atualizarBarraLobbyUI();
+  carregarNivel(indiceValido);
   atualizarHUD();
 }
 
@@ -499,15 +723,11 @@ function carregarNivel(indice) {
   soldado.vy = 0;
   soldado.noChao = true;
 
-  if (indice > 0) {
-    soldado.vida = Math.min(soldado.vidaMaxima, soldado.vida + 25);
-  }
-
   estadoJogo.plataformas = [];
   if (configNivel.numero === 1) {
     configurarMapaFase1(configNivel.distanciaMeta);
     posicionarRastejadoresMapa();
-  } else if (configNivel.numero < 5) {
+  } else if (configNivel.numero === 2) {
     for (let posX = 420; posX < configNivel.distanciaMeta - 300; posX += 460) {
       estadoJogo.plataformas.push({
         x: posX,
@@ -535,7 +755,7 @@ function carregarNivel(indice) {
   }
 
   if (estadoJogo.status === "jogando") {
-    iniciarMusicaFase(configNivel.numero);
+    iniciarMusica(configNivel.numero);
   }
 }
 
@@ -609,7 +829,7 @@ function criarRastejador(x, alcance = 250, velocidadeAtaque = 1.5, indice = 0) {
     vy: 0,
     vida: 1,
     pontos: 60,
-    estado: "esperando", // "esperando" | "atacando" | "saltando_mergulho" | "mergulhando" | "subterraneo" | "saindo_terra"
+    estado: "esperando",
     obstaculoAlvo: null,
     buracoEntradaId: null,
     caminhoId: null,
@@ -640,15 +860,105 @@ function criarBoss() {
   };
 }
 
-function finalizarPartida(venceu) {
+function gerarParticulasVitoria(origemTelaX, origemTelaY) {
+  const cores = ["#ffd43b", "#51cf66", "#339af0", "#ff922b", "#f06595"];
+  estadoJogo.particulasVitoria = [];
+  for (let i = 0; i < 42; i++) {
+    const angulo = Math.random() * Math.PI * 2;
+    const vel = 1.8 + Math.random() * 5.2;
+    estadoJogo.particulasVitoria.push({
+      x: origemTelaX,
+      y: origemTelaY,
+      vx: Math.cos(angulo) * vel,
+      vy: Math.sin(angulo) * vel - 2.6,
+      vida: 55 + Math.floor(Math.random() * 35),
+      vidaMax: 90,
+      tamanho: 4 + Math.random() * 4,
+      cor: cores[i % cores.length],
+      rotacao: Math.random() * Math.PI * 2,
+      vRotacao: (Math.random() - 0.5) * 0.25
+    });
+  }
+}
+
+function concluirFaseComVitoria(indiceFase) {
+  if (estadoJogo.status !== "jogando") return;
+
   pararMusicaFase();
-  tocarSfxFimPartida(venceu);
-  estadoJogo.status = venceu ? "vitoria" : "derrota";
-  tituloFim.textContent = venceu ? "Missão Cumprida!" : "Soldado Abatido!";
-  mensagemFim.textContent = venceu
-    ? "Você atravessou os 5 setores e destruiu o Colosso Bélico!"
-    : "Sua energia chegou a zero. Tente novamente!";
+  tocarMusiquinhaVitoriaFase();
+
+  if (!estadoJogo.fasesConcluidas.includes(indiceFase)) {
+    estadoJogo.fasesConcluidas.push(indiceFase);
+  }
+
+  const proximoIndice = indiceFase + 1;
+  const campanhaCompleta = proximoIndice >= NIVEIS.length;
+  if (!campanhaCompleta && proximoIndice > estadoJogo.maiorFaseDesbloqueada) {
+    estadoJogo.maiorFaseDesbloqueada = proximoIndice;
+  }
+
+  salvarProgresso();
+
+  estadoJogo.status = "vitoria_fase";
+  estadoJogo.vitoriaFaseConcluidaIndice = indiceFase;
+  estadoJogo.vitoriaCampanhaCompleta = campanhaCompleta;
+  estadoJogo.vitoriaTimerFrames = 145; // ~2.4s de ação e musiquinha antes de voltar ao lobby
+
+  soldado.vx = 0;
+  soldado.vy = -5.5;
+  soldado.noChao = false;
+
+  const telaX = soldado.x - estadoJogo.cameraX + soldado.largura / 2;
+  const telaY = soldado.y + soldado.alturaAtual / 2;
+  gerarParticulasVitoria(telaX, telaY);
+  atualizarBarraLobbyUI();
+  atualizarHUD();
+}
+
+function atualizarAcaoVitoriaFase() {
+  estadoJogo.vitoriaTimerFrames--;
+
+  // Pulo comemorativo do soldado
+  soldado.vy += GRAVIDADE * 0.6;
+  soldado.y += soldado.vy;
+  if (soldado.y + soldado.alturaAtual >= CHAO_Y) {
+    soldado.y = CHAO_Y - soldado.alturaAtual;
+    if (estadoJogo.vitoriaTimerFrames > 35) {
+      soldado.vy = -6.2;
+      soldado.noChao = false;
+    } else {
+      soldado.vy = 0;
+      soldado.noChao = true;
+    }
+  }
+
+  for (let i = estadoJogo.particulasVitoria.length - 1; i >= 0; i--) {
+    const p = estadoJogo.particulasVitoria[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.12;
+    p.rotacao += p.vRotacao;
+    p.vida--;
+    if (p.vida <= 0) {
+      estadoJogo.particulasVitoria.splice(i, 1);
+    }
+  }
+
+  if (estadoJogo.vitoriaTimerFrames <= 0) {
+    const proximo = estadoJogo.vitoriaFaseConcluidaIndice + 1;
+    const noAlvo = proximo < NIVEIS.length ? proximo : estadoJogo.vitoriaFaseConcluidaIndice;
+    abrirLobby(noAlvo);
+  }
+}
+
+function finalizarDerrota() {
+  pararMusicaFase();
+  tocarSfxDerrota();
+  estadoJogo.status = "derrota";
+  tituloFim.textContent = "Soldado Abatido!";
+  mensagemFim.textContent = "Sua energia chegou a zero. Tente novamente ou volte ao lobby.";
   pontuacaoFinalEl.textContent = estadoJogo.pontuacao;
+  atualizarBarraLobbyUI();
   overlayFim.classList.remove("oculto");
 }
 
@@ -656,8 +966,17 @@ function finalizarPartida(venceu) {
 // 5. EVENTOS (APENAS addEventListener)
 // =========================================================
 function registrarEventos() {
-  btnIniciar.addEventListener("click", iniciarPartida);
-  btnReiniciar.addEventListener("click", iniciarPartida);
+  btnReiniciar.addEventListener("click", function () {
+    iniciarFase(estadoJogo.nivelIndice);
+  });
+
+  btnVoltarLobby.addEventListener("click", function () {
+    abrirLobby(estadoJogo.nivelIndice);
+  });
+
+  if (btnResetProgresso) {
+    btnResetProgresso.addEventListener("click", resetarProgressoLobby);
+  }
 
   if (btnSom) {
     btnSom.addEventListener("click", alternarSom);
@@ -677,6 +996,20 @@ function registrarEventos() {
       clickY <= botaoSomCanvas.y + botaoSomCanvas.altura
     ) {
       alternarSom();
+      return;
+    }
+
+    if (estadoJogo.status === "lobby") {
+      garantirAudioContexto();
+      for (let i = 0; i < NOS_LOBBY.length; i++) {
+        const no = NOS_LOBBY[i];
+        const dist = Math.hypot(clickX - no.x, clickY - no.y);
+        if (dist <= no.raio + 10) {
+          posicionarSoldadoNoNoLobby(no.indice);
+          tentarEntrarNaFase(no.indice);
+          return;
+        }
+      }
     }
   });
 
@@ -689,16 +1022,24 @@ function registrarEventos() {
       return;
     }
 
-    if (estadoJogo.status === "jogando") {
+    if (estadoJogo.status === "lobby" || estadoJogo.status === "jogando") {
       garantirAudioContexto();
     }
 
-    if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(codigo)) {
+    if (["Space", "Enter", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(codigo)) {
       evento.preventDefault();
     }
 
-    if (codigo === "KeyR" && estadoJogo.status !== "menu") {
-      iniciarPartida();
+    if (estadoJogo.status === "lobby" && !evento.repeat) {
+      if (codigo === "Enter" || codigo === "Space") {
+        const alvo = estadoJogo.faseNoNo >= 0 ? estadoJogo.faseNoNo : estadoJogo.maiorFaseDesbloqueada;
+        tentarEntrarNaFase(alvo);
+        return;
+      }
+    }
+
+    if (codigo === "KeyR" && estadoJogo.status === "jogando") {
+      iniciarFase(estadoJogo.nivelIndice);
     }
   });
 
@@ -938,7 +1279,7 @@ function atualizarSoldado() {
     soldado.noChao = true;
   }
 
-  if (configNivel.numero < 5) {
+  if (configNivel.numero < NIVEIS.length) {
     const limiteCamera = soldado.x - canvas.width * 0.38;
     if (limiteCamera > estadoJogo.cameraX) {
       estadoJogo.cameraX = Math.min(limiteCamera, configNivel.distanciaMeta - canvas.width);
@@ -950,9 +1291,10 @@ function atualizarSoldado() {
     estadoJogo.ultimoTiroFrame = estadoJogo.frameAtual;
   }
 
-  if (configNivel.numero < 5 && soldado.x + soldado.largura >= configNivel.distanciaMeta - 20) {
+  // Ao alcançar a meta de uma fase normal, celebra vitória e retorna ao lobby com a próxima desbloqueada
+  if (configNivel.numero < NIVEIS.length && soldado.x + soldado.largura >= configNivel.distanciaMeta - 20) {
     estadoJogo.pontuacao += 200;
-    carregarNivel(estadoJogo.nivelIndice + 1);
+    concluirFaseComVitoria(estadoJogo.nivelIndice);
   }
 }
 
@@ -1007,14 +1349,14 @@ function gerarInimigos() {
 
   if (estadoJogo.frameAtual % configNivel.intervaloSpawn !== 0) return;
 
-  if (configNivel.numero === 5 && (!estadoJogo.boss || estadoJogo.inimigos.length >= 2)) {
+  if (configNivel.numero === 3 && (!estadoJogo.boss || estadoJogo.inimigos.length >= 2)) {
     return;
   }
 
   const tipos = configNivel.tiposInimigos;
   const tipoEscolhido = tipos[Math.floor(Math.random() * tipos.length)];
   const spawnX =
-    configNivel.numero === 5
+    configNivel.numero === 3
       ? canvas.width - 40
       : Math.min(estadoJogo.cameraX + canvas.width + 30, configNivel.distanciaMeta - 80);
 
@@ -1062,20 +1404,6 @@ function gerarInimigos() {
       pontos: 90,
       danoFrames: 0,
       cor: "#56b6c2"
-    });
-  } else if (tipoEscolhido === "blindado") {
-    estadoJogo.inimigos.push({
-      tipo: "blindado",
-      x: spawnX,
-      y: CHAO_Y - 58,
-      largura: 48,
-      altura: 58,
-      vx: -1.4,
-      vy: 0,
-      vida: 5,
-      pontos: 180,
-      danoFrames: 0,
-      cor: "#e5c07b"
     });
   }
 }
@@ -1142,7 +1470,7 @@ function criarCaminhoSubterraneo(xEntrada, xSaida, dir, profundidadeMax = 28) {
     xSaida: xSaida,
     xAtual: xEntrada,
     dir: dir,
-    progressoU: 0, // 0 = entrada, 0.5 = fundo do U, 1 = saída
+    progressoU: 0,
     profundidadeMax: profundidadeMax,
     monticulos: gerarMonticulosFormigueiro(
       (xEntrada + xSaida) / 2,
@@ -1616,8 +1944,9 @@ function atualizarProjeteis() {
       if (bossEliminado) {
         estadoJogo.pontuacao += 1000;
         estadoJogo.boss = null;
+        estadoJogo.tirosInimigos = [];
         atualizarHUD();
-        finalizarPartida(true);
+        concluirFaseComVitoria(estadoJogo.nivelIndice);
         return;
       }
     }
@@ -1695,6 +2024,7 @@ function atualizarParticulasDano() {
 }
 
 function aplicarDanoSoldado(dano, direcaoImpacto = -1) {
+  if (estadoJogo.status !== "jogando") return;
   if (estadoJogo.frameAtual < estadoJogo.invulneravelAte) return;
 
   tocarSfxDano();
@@ -1729,7 +2059,7 @@ function aplicarDanoSoldado(dano, direcaoImpacto = -1) {
 
   if (soldado.vida <= 0) {
     atualizarHUD();
-    finalizarPartida(false);
+    finalizarDerrota();
   }
 }
 
@@ -1749,12 +2079,27 @@ function colidiu(a, b) {
 // 9. ATUALIZAÇÃO DO DOM (HUD) E RENDERIZAÇÃO NO CANVAS
 // =========================================================
 function atualizarHUD() {
-  const configNivel = NIVEIS[estadoJogo.nivelIndice];
+  const indiceReferencia =
+    estadoJogo.status === "lobby"
+      ? estadoJogo.faseNoNo >= 0
+        ? estadoJogo.faseNoNo
+        : estadoJogo.maiorFaseDesbloqueada
+      : estadoJogo.nivelIndice;
+  const configNivel = NIVEIS[indiceReferencia] || NIVEIS[0];
+
   hudNivel.textContent = `${configNivel.numero} / ${NIVEIS.length}`;
   hudVida.textContent = soldado.vida;
   hudPontos.textContent = estadoJogo.pontuacao;
 
-  if (configNivel.numero < 5) {
+  if (estadoJogo.status === "lobby") {
+    const pctDesbloqueio = Math.round(
+      (estadoJogo.fasesConcluidas.length / NIVEIS.length) * 100
+    );
+    hudProgresso.textContent = `${pctDesbloqueio}%`;
+    return;
+  }
+
+  if (configNivel.numero < NIVEIS.length) {
     const pct = Math.min(100, Math.floor((soldado.x / (configNivel.distanciaMeta - 40)) * 100));
     hudProgresso.textContent = `${pct}%`;
   } else {
@@ -1783,6 +2128,211 @@ function desenharBotaoSomCanvas() {
     b.x + b.largura / 2,
     b.y + b.altura / 2
   );
+  ctx.restore();
+}
+
+function desenharMapaLobbyCuphead() {
+  // Fundo estilizado estilo mapa retrô de Inkwell / Vanguarda
+  const gradFundo = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  gradFundo.addColorStop(0, "#1d2a3a");
+  gradFundo.addColorStop(0.55, "#2b3b2d");
+  gradFundo.addColorStop(1, "#433827");
+  ctx.fillStyle = gradFundo;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Detalhes de relevo e vegetação do mapa
+  ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
+  ctx.beginPath();
+  ctx.arc(190, 265, 115, 0, Math.PI * 2);
+  ctx.arc(455, 195, 110, 0, Math.PI * 2);
+  ctx.arc(725, 265, 125, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Trilhas conectando os nós (Fase 1 -> Fase 2 -> Fase 3 Boss)
+  for (let i = 0; i < NOS_LOBBY.length - 1; i++) {
+    const origem = NOS_LOBBY[i];
+    const destino = NOS_LOBBY[i + 1];
+    const trilhaLiberada = faseEstaDesbloqueada(destino.indice);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(origem.x, origem.y);
+    ctx.quadraticCurveTo(
+      (origem.x + destino.x) / 2,
+      Math.min(origem.y, destino.y) - 34,
+      destino.x,
+      destino.y
+    );
+    ctx.strokeStyle = "#14181f";
+    ctx.lineWidth = 14;
+    ctx.lineCap = "round";
+    ctx.stroke();
+
+    ctx.strokeStyle = trilhaLiberada ? "#f0b429" : "#64748b";
+    ctx.lineWidth = 8;
+    ctx.setLineDash(trilhaLiberada ? [] : [8, 8]);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Nós das fases no mapa
+  const pulso = 1 + Math.sin(estadoJogo.frameAtual * 0.1) * 0.08;
+  for (let i = 0; i < NOS_LOBBY.length; i++) {
+    const no = NOS_LOBBY[i];
+    const desbloqueada = faseEstaDesbloqueada(no.indice);
+    const concluida = faseEstaConcluida(no.indice);
+    const selecionado = estadoJogo.faseNoNo === no.indice;
+
+    ctx.save();
+
+    if (desbloqueada && selecionado) {
+      ctx.strokeStyle = "#fff3bf";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(no.x, no.y, (no.raio + 8) * pulso, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = !desbloqueada
+      ? "#334155"
+      : concluida
+      ? "#2b8a3e"
+      : no.corPonto;
+    ctx.strokeStyle = "#11161d";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(no.x, no.y, no.raio, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = desbloqueada ? "#11161d" : "#cbd5e1";
+    ctx.font = "bold 11px Segoe UI, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(desbloqueada ? (concluida ? "✔ OK" : no.rotuloCurto) : "🔒", no.x, no.y);
+
+    // Placa com nome da fase
+    ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
+    ctx.strokeStyle = desbloqueada ? "#f0b429" : "#475569";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(no.x - 84, no.y + no.raio + 10, 168, 38, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = desbloqueada ? "#ffffff" : "#94a3b8";
+    ctx.font = "bold 12px Segoe UI, sans-serif";
+    ctx.fillText(no.titulo, no.x, no.y + no.raio + 23);
+
+    ctx.fillStyle = desbloqueada ? "#cbd5e1" : "#64748b";
+    ctx.font = "10px Segoe UI, sans-serif";
+    ctx.fillText(
+      desbloqueada ? no.subtitulo : "Passe a fase anterior",
+      no.x,
+      no.y + no.raio + 37
+    );
+
+    ctx.restore();
+  }
+
+  // Soldado andando pelo mapa do lobby
+  desenharSoldado();
+
+  // Banner superior do mapa
+  ctx.save();
+  ctx.fillStyle = "rgba(15, 23, 42, 0.82)";
+  ctx.strokeStyle = "#f0b429";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(18, 12, 390, 32, 6);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#f0b429";
+  ctx.font = "bold 13px Segoe UI, sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText("MAPA DO LOBBY • Ande até a fase e aperte Enter/Espaço", 30, 28);
+  ctx.restore();
+
+  // Prompt de entrada quando o soldado para sobre uma fase
+  if (estadoJogo.faseNoNo >= 0) {
+    const noAtual = NOS_LOBBY[estadoJogo.faseNoNo];
+    const liberado = faseEstaDesbloqueada(noAtual.indice);
+    ctx.save();
+    ctx.fillStyle = liberado ? "rgba(20, 83, 45, 0.92)" : "rgba(127, 29, 29, 0.92)";
+    ctx.strokeStyle = liberado ? "#69db7c" : "#ff8787";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(canvas.width / 2 - 195, 54, 390, 34, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 13px Segoe UI, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(
+      liberado
+        ? `Pressione ENTER ou ESPAÇO para entrar em ${noAtual.titulo}`
+        : `${noAtual.titulo} bloqueada — conclua a fase anterior primeiro`,
+      canvas.width / 2,
+      71
+    );
+    ctx.restore();
+  } else if (estadoJogo.mensagemBloqueioFrames > 0) {
+    ctx.save();
+    ctx.fillStyle = "rgba(127, 29, 29, 0.92)";
+    ctx.fillRect(canvas.width / 2 - 180, 54, 360, 32);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 12px Segoe UI, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Fase bloqueada! Conclua a fase anterior para abrir.", canvas.width / 2, 74);
+    ctx.restore();
+  }
+
+  desenharBotaoSomCanvas();
+}
+
+function desenharAcaoVitoriaOverlay() {
+  if (estadoJogo.status !== "vitoria_fase") return;
+
+  for (let i = 0; i < estadoJogo.particulasVitoria.length; i++) {
+    const p = estadoJogo.particulasVitoria[i];
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, p.vida / p.vidaMax);
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rotacao);
+    ctx.fillStyle = p.cor;
+    ctx.fillRect(-p.tamanho / 2, -p.tamanho / 2, p.tamanho, p.tamanho);
+    ctx.restore();
+  }
+
+  const proximo = estadoJogo.vitoriaFaseConcluidaIndice + 1;
+  const subtitulo =
+    proximo < NIVEIS.length
+      ? `Próxima fase desbloqueada no lobby: ${NIVEIS[proximo].nome.split(" - ")[1]}`
+      : "Campanha concluída! Voltando ao lobby...";
+
+  ctx.save();
+  ctx.fillStyle = "rgba(11, 15, 20, 0.72)";
+  ctx.fillRect(canvas.width / 2 - 260, 125, 520, 108);
+  ctx.strokeStyle = "#ffd43b";
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(canvas.width / 2 - 260, 125, 520, 108);
+
+  ctx.fillStyle = "#ffd43b";
+  ctx.font = "bold 26px Segoe UI, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("FASE CONCLUÍDA!", canvas.width / 2, 165);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "14px Segoe UI, sans-serif";
+  ctx.fillText(subtitulo, canvas.width / 2, 198);
+
+  ctx.fillStyle = "#9fb3c8";
+  ctx.font = "12px Segoe UI, sans-serif";
+  ctx.fillText("Retornando ao mapa do lobby...", canvas.width / 2, 220);
   ctx.restore();
 }
 
@@ -1954,7 +2504,7 @@ function desenharEntradaCaverna(xBase, configNivel) {
   ctx.fillStyle = "#ffd43b";
   ctx.beginPath();
   ctx.moveTo(tochaX - 4, tochaY);
-  ctx.quadraticCurveTo(tochaX - 5, tochaY - 6, pontaChamaX, tochaY - 9);
+  ctx.quadraticCurveTo(tochaX - 5, tochaY - 6, pontaChamaX, pontaChamaY);
   ctx.quadraticCurveTo(tochaX + 2, tochaY - 5, tochaX + 1, tochaY);
   ctx.closePath();
   ctx.fill();
@@ -2429,7 +2979,9 @@ function desenharSoldado() {
   const emDano = estadoJogo.danoSoldadoFrames > 0;
   const centroX = soldado.x + soldado.largura / 2;
   const baseY = soldado.y + soldado.alturaAtual;
-  const andando = Math.abs(soldado.vx) > 0.1 && soldado.noChao;
+  const andando =
+    (Math.abs(soldado.vx) > 0.1 || Math.abs(soldado.vy) > 0.1) &&
+    (soldado.noChao || estadoJogo.status === "lobby");
   const paradoNoChao = !andando && soldado.noChao;
   const cicloPasso = andando ? Math.sin(estadoJogo.frameAtual * 0.35) : 0;
   const cicloRastejar = andando && soldado.deitado ? Math.sin(estadoJogo.frameAtual * 0.32) : 0;
@@ -2483,8 +3035,8 @@ function desenharSoldado() {
 
     desenharFuzil(11 + impulsoRastejarX * 0.4, -9 + elevacaoTroncoY * 0.6, 0, atirouAgora);
   } else {
-    const deslocamentoPerna = soldado.noChao ? cicloPasso * 7 : 5;
-    const elevacaoPulo = soldado.noChao ? 0 : -4;
+    const deslocamentoPerna = soldado.noChao || estadoJogo.status === "lobby" ? cicloPasso * 7 : 5;
+    const elevacaoPulo = soldado.noChao || estadoJogo.status === "lobby" ? 0 : -4;
     const deslocamentoRespiracaoY = cicloRespiracao * 1.4;
     const expansaoPeito = Math.max(0, cicloRespiracao) * 1.2;
     const balancoTronco = andando
@@ -2581,6 +3133,11 @@ function desenharFuzil(origemX, origemY, angulo, atirouAgora) {
 }
 
 function desenharCena() {
+  if (estadoJogo.status === "lobby") {
+    desenharMapaLobbyCuphead();
+    return;
+  }
+
   const configNivel = NIVEIS[estadoJogo.nivelIndice];
 
   if (configNivel.numero === 1) {
@@ -2605,7 +3162,7 @@ function desenharCena() {
   desenharEstruturasQuebradas();
   desenharPlataformas(configNivel);
 
-  if (configNivel.numero < 5) {
+  if (configNivel.numero < NIVEIS.length) {
     desenharEntradaCaverna(configNivel.distanciaMeta, configNivel);
   }
 
@@ -2613,7 +3170,7 @@ function desenharCena() {
     estadoJogo.frameAtual < estadoJogo.invulneravelAte &&
     Math.floor(estadoJogo.frameAtual / 4) % 2 === 0;
 
-  if (!piscando || estadoJogo.danoSoldadoFrames > 0) {
+  if (!piscando || estadoJogo.danoSoldadoFrames > 0 || estadoJogo.status === "vitoria_fase") {
     desenharSoldado();
   }
 
@@ -2710,6 +3267,7 @@ function desenharCena() {
     ctx.textAlign = "start";
   }
 
+  desenharAcaoVitoriaOverlay();
   desenharBotaoSomCanvas();
 }
 
@@ -2717,7 +3275,11 @@ function desenharCena() {
 // 10. LOOP PRINCIPAL
 // =========================================================
 function loopPrincipal() {
-  if (estadoJogo.status === "jogando") {
+  if (estadoJogo.status === "lobby") {
+    estadoJogo.frameAtual++;
+    atualizarLobbyCuphead();
+    atualizarHUD();
+  } else if (estadoJogo.status === "jogando") {
     estadoJogo.frameAtual++;
     atualizarPlataformas();
     atualizarSoldado();
@@ -2729,6 +3291,9 @@ function loopPrincipal() {
     atualizarProjeteis();
     atualizarParticulasDano();
     atualizarHUD();
+  } else if (estadoJogo.status === "vitoria_fase") {
+    estadoJogo.frameAtual++;
+    atualizarAcaoVitoriaFase();
   }
 
   desenharCena();
@@ -2738,5 +3303,5 @@ function loopPrincipal() {
 // Inicialização ao carregar o script
 registrarEventos();
 atualizarBotaoSomUI();
-desenharCena();
+abrirLobby(estadoJogo.maiorFaseDesbloqueada);
 loopPrincipal();

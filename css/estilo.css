@@ -83,6 +83,22 @@ body {
   height: auto;
 }
 
+.barra-lobby {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background-color: #17202c;
+  border-top: 2px solid #2f3e52;
+  font-size: 0.9rem;
+  color: #d9e2ec;
+}
+
+.barra-lobby.oculto {
+  display: none;
+}
+
 .overlay {
   position: absolute;
   inset: 0;
@@ -111,60 +127,15 @@ body {
   line-height: 1.5;
 }
 
-.lobby-fases {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(160px, 1fr));
-  gap: 12px;
-  width: 100%;
-  max-width: 660px;
-  margin: 4px 0 6px;
-}
-
-.btn-fase {
-  background-color: #1c2532;
-  border: 2px solid #2f3e52;
-  border-radius: 8px;
-  padding: 12px 14px;
-  color: #e6edf3;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.12s ease;
-}
-
-.btn-fase:hover {
-  border-color: #f0b429;
-  background-color: #243041;
-}
-
-.btn-fase.ativo {
-  border-color: #f0b429;
-  background-color: rgba(240, 180, 41, 0.16);
-  transform: translateY(-2px);
-}
-
-.fase-tag {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #f0b429;
-  font-weight: bold;
-}
-
-.btn-fase strong {
-  font-size: 1rem;
-  color: #ffffff;
-}
-
-.btn-fase small {
-  font-size: 0.78rem;
-  color: #9fb3c8;
-}
-
 .placar-final {
   font-size: 1.15rem;
+}
+
+.acoes-fim {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
 }
 
 .btn-primario {
@@ -172,7 +143,7 @@ body {
   color: #ffffff;
   border: none;
   border-radius: 6px;
-  padding: 12px 26px;
+  padding: 12px 24px;
   font-size: 1rem;
   font-weight: bold;
   cursor: pointer;
@@ -185,6 +156,23 @@ body {
 
 .btn-primario:active {
   transform: scale(0.98);
+}
+
+.btn-secundario {
+  background-color: #243244;
+  color: #e6edf3;
+  border: 1.5px solid #48607e;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.btn-secundario:hover {
+  background-color: #2f4158;
+  border-color: #f0b429;
 }
 
 .instrucoes {
@@ -215,10 +203,4 @@ body {
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 0.85rem;
-}
-
-@media (max-width: 600px) {
-  .lobby-fases {
-    grid-template-columns: 1fr;
-  }
 }

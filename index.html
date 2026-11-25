@@ -9,7 +9,7 @@
 <body>
   <header class="cabecalho">
     <h1>Operação Vanguarda</h1>
-    <p class="subtitulo">Escolha o setor no lobby, elimine as ameaças e derrote o Boss no Setor 3!</p>
+    <p class="subtitulo">Ande pelo mapa do lobby até a fase desbloqueada, pressione Enter/Espaço e derrote o Boss no Setor 3!</p>
   </header>
 
   <main class="container-principal">
@@ -37,38 +37,21 @@
     <div class="palco-wrapper">
       <canvas id="tela-jogo" width="900" height="440"></canvas>
 
-      <!-- Lobby / Tela inicial sobreposta -->
-      <div id="overlay-inicio" class="overlay">
-        <h2>Lobby de Missão</h2>
-        <p>Selecione a fase que deseja jogar e inicie a operação:</p>
-
-        <div id="lobby-fases" class="lobby-fases" role="group" aria-label="Seleção de fase">
-          <button type="button" class="btn-fase ativo" data-fase="0">
-            <span class="fase-tag">Fase 1</span>
-            <strong>Ruínas</strong>
-            <small>Rastejadores e escombros</small>
-          </button>
-          <button type="button" class="btn-fase" data-fase="1">
-            <span class="fase-tag">Fase 2</span>
-            <strong>Trincheiras</strong>
-            <small>Saltadores, atiradores e drones</small>
-          </button>
-          <button type="button" class="btn-fase" data-fase="2">
-            <span class="fase-tag">Fase 3</span>
-            <strong>Núcleo do Boss</strong>
-            <small>Confronto contra o Boss</small>
-          </button>
-        </div>
-
-        <button id="btn-iniciar" type="button" class="btn-primario">Iniciar Fase 1</button>
+      <!-- Barra de atalhos discretos do lobby -->
+      <div id="barra-lobby" class="barra-lobby">
+        <span id="status-lobby-texto">Lobby: ande até a fase e aperte Enter ou Espaço</span>
+        <button id="btn-reset-progresso" type="button" class="btn-secundario">Resetar Fases</button>
       </div>
 
-      <!-- Tela de fim de partida (Vitória ou Derrota) -->
+      <!-- Tela de fim de partida (Derrota ou vitória completa) -->
       <div id="overlay-fim" class="overlay oculto">
         <h2 id="titulo-fim">Fim de Jogo</h2>
         <p id="mensagem-fim">Você foi derrotado em combate.</p>
         <p class="placar-final">Pontuação Final: <strong id="pontuacao-final">0</strong></p>
-        <button id="btn-reiniciar" type="button" class="btn-primario">Jogar Novamente</button>
+        <div class="acoes-fim">
+          <button id="btn-reiniciar" type="button" class="btn-primario">Jogar Novamente</button>
+          <button id="btn-voltar-lobby" type="button" class="btn-secundario">Voltar ao Lobby</button>
+        </div>
       </div>
     </div>
 
@@ -76,13 +59,13 @@
     <section class="instrucoes">
       <h2>Como Jogar</h2>
       <ul class="lista-controles">
-        <li><strong>A / D</strong> ou <strong>← / →</strong>: Andar para trás e para frente</li>
+        <li><strong>Lobby</strong>: <strong>A/D</strong> ou <strong>←/→</strong> para andar • <strong>Enter/Espaço</strong> ou clique na fase para entrar</li>
+        <li><strong>A / D</strong> ou <strong>← / →</strong>: Andar para trás e para frente em combate</li>
         <li><strong>W</strong> ou <strong>↑</strong> (segurar): Mirar para cima</li>
         <li><strong>S</strong> ou <strong>↓</strong> (segurar): Agachar (desvia de tiros altos)</li>
         <li><strong>Espaço</strong>: Pular sobre obstáculos e plataformas</li>
         <li><strong>J</strong> ou <strong>Z</strong>: Atirar (para frente ou para cima)</li>
-        <li><strong>M</strong>: Alternar som (mudo / ativo)</li>
-        <li><strong>R</strong>: Reiniciar partida a qualquer momento</li>
+        <li><strong>M</strong>: Alternar som • <strong>R</strong>: Reiniciar fase</li>
       </ul>
     </section>
   </main>
