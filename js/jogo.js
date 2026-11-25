@@ -1405,6 +1405,201 @@ function atualizarHUD() {
   }
 }
 
+function desenharEntradaCaverna(xBase, configNivel) {
+  const baseX = xBase - 38;
+  const chao = CHAO_Y;
+  const oscilacaoChama = Math.sin(estadoJogo.frameAtual * 0.35);
+  const oscilacaoBrilho = Math.cos(estadoJogo.frameAtual * 0.22) * 2.5;
+
+  ctx.save();
+
+  // 1. Maciço rochoso traseiro / sombra da montanha
+  ctx.fillStyle = "#24201c";
+  ctx.beginPath();
+  ctx.moveTo(baseX - 18, chao + 2);
+  ctx.lineTo(baseX - 10, chao - 68);
+  ctx.lineTo(baseX + 16, chao - 104);
+  ctx.lineTo(baseX + 48, chao - 118);
+  ctx.lineTo(baseX + 78, chao - 96);
+  ctx.lineTo(baseX + 94, chao - 54);
+  ctx.lineTo(baseX + 98, chao + 2);
+  ctx.closePath();
+  ctx.fill();
+
+  // 2. Camadas rochosas principais com facetas realistas
+  ctx.fillStyle = "#3b352f";
+  ctx.beginPath();
+  ctx.moveTo(baseX - 12, chao + 2);
+  ctx.lineTo(baseX - 4, chao - 56);
+  ctx.lineTo(baseX + 18, chao - 92);
+  ctx.lineTo(baseX + 46, chao - 106);
+  ctx.lineTo(baseX + 72, chao - 84);
+  ctx.lineTo(baseX + 86, chao - 42);
+  ctx.lineTo(baseX + 90, chao + 2);
+  ctx.closePath();
+  ctx.fill();
+
+  // Destaque de luz superior nas rochas
+  ctx.fillStyle = "#574f46";
+  ctx.beginPath();
+  ctx.moveTo(baseX + 18, chao - 92);
+  ctx.lineTo(baseX + 46, chao - 106);
+  ctx.lineTo(baseX + 66, chao - 88);
+  ctx.lineTo(baseX + 42, chao - 94);
+  ctx.lineTo(baseX + 12, chao - 74);
+  ctx.closePath();
+  ctx.fill();
+
+  // Pedras soltas e saliências ao redor da boca da caverna
+  const blocosPedra = [
+    { x: baseX - 16, y: chao - 24, w: 22, h: 24, cor: "#4a433b", sombra: "#2b2621" },
+    { x: baseX - 6, y: chao - 54, w: 24, h: 20, cor: "#5c5349", sombra: "#332d27" },
+    { x: baseX + 18, y: chao - 86, w: 28, h: 18, cor: "#665c51", sombra: "#3a342d" },
+    { x: baseX + 48, y: chao - 78, w: 24, h: 20, cor: "#524a41", sombra: "#2e2924" },
+    { x: baseX + 66, y: chao - 34, w: 22, h: 34, cor: "#463f38", sombra: "#26221d" }
+  ];
+
+  for (let i = 0; i < blocosPedra.length; i++) {
+    const b = blocosPedra[i];
+    ctx.fillStyle = b.cor;
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y + b.h);
+    ctx.lineTo(b.x + 3, b.y + 3);
+    ctx.lineTo(b.x + b.w * 0.65, b.y);
+    ctx.lineTo(b.x + b.w, b.y + 7);
+    ctx.lineTo(b.x + b.w - 2, b.y + b.h);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = b.sombra;
+    ctx.fillRect(b.x + 2, b.y + b.h - 5, b.w - 4, 5);
+  }
+
+  // 3. Boca escura da caverna com profundidade em gradiente
+  const bocaX = baseX + 14;
+  const bocaY = chao - 64;
+  const bocaLargura = 46;
+  const bocaAltura = 64;
+
+  const gradCaverna = ctx.createLinearGradient(bocaX, bocaY, bocaX + bocaLargura, chao);
+  gradCaverna.addColorStop(0, "#050506");
+  gradCaverna.addColorStop(0.65, "#0b0a0c");
+  gradCaverna.addColorStop(1, "#181412");
+
+  ctx.fillStyle = gradCaverna;
+  ctx.beginPath();
+  ctx.moveTo(bocaX, chao + 1);
+  ctx.lineTo(bocaX + 2, bocaY + 22);
+  ctx.quadraticCurveTo(
+    bocaX + bocaLargura * 0.52,
+    bocaY - 8,
+    bocaX + bocaLargura,
+    bocaY + 24
+  );
+  ctx.lineTo(bocaX + bocaLargura - 2, chao + 1);
+  ctx.closePath();
+  ctx.fill();
+
+  // Sombra interna no teto e laterais da abertura
+  ctx.strokeStyle = "#1a1614";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(bocaX + 3, chao);
+  ctx.lineTo(bocaX + 4, bocaY + 22);
+  ctx.quadraticCurveTo(
+    bocaX + bocaLargura * 0.52,
+    bocaY - 6,
+    bocaX + bocaLargura - 3,
+    bocaY + 24
+  );
+  ctx.lineTo(bocaX + bocaLargura - 3, chao);
+  ctx.stroke();
+
+  // Frestas / rachaduras na rocha
+  ctx.strokeStyle = "#1d1916";
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(baseX + 28, chao - 96);
+  ctx.lineTo(baseX + 24, chao - 78);
+  ctx.lineTo(baseX + 31, chao - 66);
+  ctx.moveTo(baseX + 56, chao - 88);
+  ctx.lineTo(baseX + 62, chao - 68);
+  ctx.stroke();
+
+  // 4. Tocha na frente, ao lado esquerdo da entrada
+  const tochaX = baseX - 24;
+  const tochaY = chao - 36;
+
+  // Halo de luz quente ao redor da tocha e iluminando a entrada da caverna
+  const raioLuz = 42 + oscilacaoBrilho;
+  const gradLuz = ctx.createRadialGradient(
+    tochaX,
+    tochaY - 6,
+    3,
+    tochaX + 10,
+    tochaY,
+    raioLuz
+  );
+  gradLuz.addColorStop(0, "rgba(255, 214, 102, 0.42)");
+  gradLuz.addColorStop(0.55, "rgba(255, 132, 36, 0.16)");
+  gradLuz.addColorStop(1, "rgba(255, 100, 20, 0)");
+
+  ctx.fillStyle = gradLuz;
+  ctx.beginPath();
+  ctx.arc(tochaX + 10, tochaY, raioLuz, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Base de pedra e suporte da tocha fincado no chão
+  ctx.fillStyle = "#4d453d";
+  ctx.beginPath();
+  ctx.moveTo(tochaX - 9, chao + 1);
+  ctx.lineTo(tochaX - 5, chao - 11);
+  ctx.lineTo(tochaX + 6, chao - 11);
+  ctx.lineTo(tochaX + 10, chao + 1);
+  ctx.closePath();
+  ctx.fill();
+
+  // Haste de madeira / ferro inclinada levemente para a caverna
+  ctx.strokeStyle = "#2b1d12";
+  ctx.lineWidth = 4.5;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(tochaX + 1, chao - 8);
+  ctx.lineTo(tochaX - 2, tochaY + 2);
+  ctx.stroke();
+
+  // Braçadeira metálica da tocha
+  ctx.fillStyle = "#5c636a";
+  ctx.fillRect(tochaX - 5.5, tochaY - 1, 7, 5);
+
+  // Chama animada da tocha
+  const pontaChamaX = tochaX - 2 + oscilacaoChama * 2.2;
+  const pontaChamaY = tochaY - 14 - Math.abs(oscilacaoChama) * 2.5;
+
+  ctx.fillStyle = "#f76707";
+  ctx.beginPath();
+  ctx.moveTo(tochaX - 6, tochaY);
+  ctx.quadraticCurveTo(tochaX - 8, tochaY - 9, pontaChamaX, pontaChamaY);
+  ctx.quadraticCurveTo(tochaX + 4, tochaY - 8, tochaX + 2, tochaY);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "#ffd43b";
+  ctx.beginPath();
+  ctx.moveTo(tochaX - 4, tochaY);
+  ctx.quadraticCurveTo(tochaX - 5, tochaY - 6, pontaChamaX, tochaY - 9);
+  ctx.quadraticCurveTo(tochaX + 2, tochaY - 5, tochaX + 1, tochaY);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "#fff9db";
+  ctx.beginPath();
+  ctx.arc(tochaX - 1.5, tochaY - 3, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
 function desenharCaminhosSubterraneos() {
   for (let i = 0; i < estadoJogo.caminhosSubterraneos.length; i++) {
     const cam = estadoJogo.caminhosSubterraneos[i];
@@ -2044,10 +2239,7 @@ function desenharCena() {
   desenharPlataformas(configNivel);
 
   if (configNivel.numero < 5) {
-    ctx.fillStyle = "#f0b429";
-    ctx.fillRect(configNivel.distanciaMeta - 35, CHAO_Y - 90, 12, 90);
-    ctx.fillStyle = "#38b2ac";
-    ctx.fillRect(configNivel.distanciaMeta - 23, CHAO_Y - 90, 34, 24);
+    desenharEntradaCaverna(configNivel.distanciaMeta, configNivel);
   }
 
   const piscando =
