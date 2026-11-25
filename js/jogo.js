@@ -1,6 +1,8 @@
 // =========================================================
 // 1. SELEÇÃO DE ELEMENTOS DO DOM
 // =========================================================
+const appTelaCheia = document.querySelector("#app-tela-cheia");
+const palcoWrapper = document.querySelector("#palco-wrapper");
 const canvas = document.querySelector("#tela-jogo");
 const ctx = canvas.getContext("2d");
 
@@ -11,7 +13,32 @@ const hudProgresso = document.querySelector("#hud-progresso");
 
 const barraLobby = document.querySelector("#barra-lobby");
 const statusLobbyTexto = document.querySelector("#status-lobby-texto");
+const btnLobbyMenu = document.querySelector("#btn-lobby-menu");
 const btnResetProgresso = document.querySelector("#btn-reset-progresso");
+
+const overlayPressKey = document.querySelector("#overlay-press-key");
+const overlayIntro = document.querySelector("#overlay-intro");
+const btnPularIntro = document.querySelector("#btn-pular-intro");
+
+const overlayMenuPrincipal = document.querySelector("#overlay-menu-principal");
+const painelMenuOpcoes = document.querySelector("#painel-menu-opcoes");
+const painelControles = document.querySelector("#painel-controles");
+const painelOpcoes = document.querySelector("#painel-opcoes");
+const painelSair = document.querySelector("#painel-sair");
+const mensagemSairEl = document.querySelector("#mensagem-sair");
+
+const btnMenuRapido = document.querySelector("#btn-menu-rapido");
+const btnMenuCampanha = document.querySelector("#btn-menu-campanha");
+const btnMenuControles = document.querySelector("#btn-menu-controles");
+const btnMenuOpcoes = document.querySelector("#btn-menu-opcoes");
+const btnMenuSair = document.querySelector("#btn-menu-sair");
+
+const btnVoltarMenuControles = document.querySelector("#btn-voltar-menu-controles");
+const btnVoltarMenuOpcoes = document.querySelector("#btn-voltar-menu-opcoes");
+const btnOpcaoSom = document.querySelector("#btn-opcao-som");
+const btnOpcaoFullscreen = document.querySelector("#btn-opcao-fullscreen");
+const btnConfirmarSair = document.querySelector("#btn-confirmar-sair");
+const btnCancelarSair = document.querySelector("#btn-cancelar-sair");
 
 const overlayFim = document.querySelector("#overlay-fim");
 const tituloFim = document.querySelector("#titulo-fim");
@@ -21,6 +48,7 @@ const pontuacaoFinalEl = document.querySelector("#pontuacao-final");
 const btnReiniciar = document.querySelector("#btn-reiniciar");
 const btnVoltarLobby = document.querySelector("#btn-voltar-lobby");
 const btnSom = document.querySelector("#btn-som");
+const btnFullscreen = document.querySelector("#btn-fullscreen");
 
 // =========================================================
 // 2. CONFIGURAÇÃO DOS 3 NÍVEIS E MAPA ESTILO CUPHEAD
@@ -171,8 +199,9 @@ const botaoSomCanvas = {
 };
 
 function atualizarBotaoSomUI() {
-  if (!btnSom) return;
-  btnSom.textContent = sistemaAudio.ativo ? "🔊 Som: ON" : "🔇 Som: OFF";
+  const rotulo = sistemaAudio.ativo ? "🔊 Som: ON" : "🔇 Som: OFF";
+  if (btnSom) btnSom.textContent = rotulo;
+  if (btnOpcaoSom) btnOpcaoSom.textContent = rotulo;
 }
 
 function alternarSom() {
@@ -324,14 +353,13 @@ function tocarMusiquinhaVitoriaFase() {
   const audioCtx = garantirAudioContexto();
   if (!audioCtx || !sistemaAudio.ativo) return;
 
-  // Fanfarra animada estilo arcade ao concluir uma fase e voltar ao lobby
   const sequencia = [
-    { freq: 523.25, delay: 0, dur: 0.12 },     // C5
-    { freq: 659.25, delay: 110, dur: 0.12 },   // E5
-    { freq: 783.99, delay: 220, dur: 0.12 },   // G5
-    { freq: 1046.5, delay: 340, dur: 0.22 },   // C6
-    { freq: 880.0, delay: 560, dur: 0.12 },    // A5
-    { freq: 1046.5, delay: 690, dur: 0.36 }    // C6 final
+    { freq: 523.25, delay: 0, dur: 0.12 },
+    { freq: 659.25, delay: 110, dur: 0.12 },
+    { freq: 783.99, delay: 220, dur: 0.12 },
+    { freq: 1046.5, delay: 340, dur: 0.22 },
+    { freq: 880.0, delay: 560, dur: 0.12 },
+    { freq: 1046.5, delay: 690, dur: 0.36 }
   ];
 
   sequencia.forEach((nota) => {
@@ -417,7 +445,7 @@ function iniciarMusica(chaveFaixa) {
 }
 
 // =========================================================
-// 3. ESTADO DO JOGO (LOBBY, DESBLOQUEIO, COMBATE E VITÓRIA)
+// 3. ESTADO DO JOGO (FLUXO INICIAL, MENU, LOBBY E COMBATE)
 // =========================================================
 const teclas = {};
 
@@ -455,7 +483,9 @@ function salvarProgresso() {
 const progressoInicial = carregarProgressoSalvo();
 
 const estadoJogo = {
-  status: "lobby", // "lobby" | "jogando" | "vitoria_fase" | "derrota" | "campanha_concluida"
+  // "press_key" | "intro" | "menu" | "lobby" | "jogando" | "vitoria_fase" | "derrota"
+  status: "press_key",
+  introTimerId: null,
   maiorFaseDesbloqueada: progressoInicial.maiorFaseDesbloqueada,
   fasesConcluidas: progressoInicial.fasesConcluidas,
   faseNoNo: 0,
@@ -505,10 +535,112 @@ const soldado = {
   noChao: false,
   deitado: false,
   olhandoCima: false,
-  direcao: 1, // 1 = direita, -1 = esquerda
+  direcao: 1,
   vida: 100,
   vidaMaxima: 100
 };
+
+// =========================================================
+// 3B. TELA CHEIA, TELA INICIAL, INTRODUÇÃO E MENU CENTRAL
+// =========================================================
+function solicitarTelaCheiaSePossivel() {
+  const alvo = appTelaCheia || document.documentElement;
+  if (!document.fullscreenElement && alvo && alvo.requestFullscreen) {
+    alvo.requestFullscreen().catch(() => {});
+  }
+}
+
+function alternarTelaCheia() {
+  if (!document.fullscreenElement) {
+    const alvo = appTelaCheia || document.documentElement;
+    if (alvo && alvo.requestFullscreen) {
+      alvo.requestFullscreen().catch(() => {});
+    }
+  } else if (document.exitFullscreen) {
+    document.exitFullscreen().catch(() => {});
+  }
+}
+
+function esconderTodosOverlays() {
+  overlayPressKey.classList.add("oculto");
+  overlayIntro.classList.add("oculto");
+  overlayMenuPrincipal.classList.add("oculto");
+  overlayFim.classList.add("oculto");
+}
+
+function limparTimerIntro() {
+  if (estadoJogo.introTimerId !== null) {
+    clearTimeout(estadoJogo.introTimerId);
+    estadoJogo.introTimerId = null;
+  }
+}
+
+function irParaTelaPressKey() {
+  limparTimerIntro();
+  pararMusicaFase();
+  estadoJogo.status = "press_key";
+  esconderTodosOverlays();
+  overlayPressKey.classList.remove("oculto");
+  atualizarBarraLobbyUI();
+  atualizarHUD();
+}
+
+function iniciarIntroducaoJogo() {
+  if (estadoJogo.status !== "press_key") return;
+  limparTimerIntro();
+  solicitarTelaCheiaSePossivel();
+  garantirAudioContexto();
+
+  estadoJogo.status = "intro";
+  esconderTodosOverlays();
+  overlayIntro.classList.remove("oculto");
+  atualizarBarraLobbyUI();
+
+  estadoJogo.introTimerId = setTimeout(() => {
+    if (estadoJogo.status === "intro") {
+      abrirMenuPrincipal("principal");
+    }
+  }, 1900);
+}
+
+function abrirMenuPrincipal(subtela = "principal") {
+  limparTimerIntro();
+  pararMusicaFase();
+  estadoJogo.status = "menu";
+  esconderTodosOverlays();
+  overlayMenuPrincipal.classList.remove("oculto");
+
+  painelMenuOpcoes.classList.add("oculto");
+  painelControles.classList.add("oculto");
+  painelOpcoes.classList.add("oculto");
+  painelSair.classList.add("oculto");
+
+  if (subtela === "controles") {
+    painelControles.classList.remove("oculto");
+  } else if (subtela === "opcoes") {
+    painelOpcoes.classList.remove("oculto");
+  } else if (subtela === "sair") {
+    mensagemSairEl.textContent =
+      "Sessão pausada. Feche esta aba/janela para sair ou volte à tela inicial.";
+    painelSair.classList.remove("oculto");
+  } else {
+    painelMenuOpcoes.classList.remove("oculto");
+  }
+
+  atualizarBarraLobbyUI();
+  atualizarHUD();
+}
+
+function sairDoJogo() {
+  limparTimerIntro();
+  pararMusicaFase();
+  try {
+    window.close();
+  } catch {
+    // Ignora se bloqueado pelo navegador
+  }
+  abrirMenuPrincipal("sair");
+}
 
 // =========================================================
 // 4. LOBBY ESTILO CUPHEAD, DESBLOQUEIO E AÇÃO DE VITÓRIA
@@ -558,6 +690,7 @@ function posicionarSoldadoNoNoLobby(indiceNo) {
 }
 
 function abrirLobby(indiceInicial = estadoJogo.maiorFaseDesbloqueada) {
+  limparTimerIntro();
   const alvo = Math.max(0, Math.min(NOS_LOBBY.length - 1, indiceInicial));
   estadoJogo.status = "lobby";
   estadoJogo.cameraX = 0;
@@ -566,7 +699,7 @@ function abrirLobby(indiceInicial = estadoJogo.maiorFaseDesbloqueada) {
   estadoJogo.tirosJogador = [];
   estadoJogo.tirosInimigos = [];
 
-  overlayFim.classList.add("oculto");
+  esconderTodosOverlays();
   posicionarSoldadoNoNoLobby(alvo);
   atualizarHUD();
 
@@ -580,7 +713,10 @@ function resetarProgressoLobby() {
   estadoJogo.fasesConcluidas = [];
   estadoJogo.pontuacao = 0;
   salvarProgresso();
-  abrirLobby(0);
+  if (estadoJogo.status === "lobby") {
+    posicionarSoldadoNoNoLobby(0);
+  }
+  atualizarHUD();
 }
 
 function tentarEntrarNaFase(indice) {
@@ -634,7 +770,6 @@ function atualizarLobbyCuphead() {
     soldado.y = yLimitado - soldado.alturaAtual;
   }
 
-  // Verifica se o soldado está em cima de algum nó de fase no mapa
   const peX = soldado.x + soldado.largura / 2;
   const peY = soldado.y + soldado.alturaAtual;
   let noEncontrado = null;
@@ -644,10 +779,9 @@ function atualizarLobbyCuphead() {
     const dist = Math.hypot(peX - no.x, peY - no.y);
     if (dist <= no.raio + 16) {
       noEncontrado = no;
-      // Encaixe suave quando para em cima da fase
       if (movendoX === 0 && movendoY === 0 && dist > 3) {
         const alvoX = no.x - soldado.largura / 2;
-        const alvoY = no.y - soldado.alturaAtual + 4;
+        const alvoY = no.y - soldado.alturaEmPe + 4;
         soldado.x += (alvoX - soldado.x) * 0.25;
         soldado.y += (alvoY - soldado.y) * 0.25;
       }
@@ -663,6 +797,7 @@ function atualizarLobbyCuphead() {
 }
 
 function iniciarFase(indice) {
+  limparTimerIntro();
   garantirAudioContexto();
 
   const indiceValido = Math.max(0, Math.min(NIVEIS.length - 1, indice));
@@ -688,7 +823,7 @@ function iniciarFase(indice) {
   soldado.largura = soldado.larguraEmPe;
   soldado.alturaAtual = soldado.alturaEmPe;
 
-  overlayFim.classList.add("oculto");
+  esconderTodosOverlays();
   atualizarBarraLobbyUI();
   carregarNivel(indiceValido);
   atualizarHUD();
@@ -902,7 +1037,7 @@ function concluirFaseComVitoria(indiceFase) {
   estadoJogo.status = "vitoria_fase";
   estadoJogo.vitoriaFaseConcluidaIndice = indiceFase;
   estadoJogo.vitoriaCampanhaCompleta = campanhaCompleta;
-  estadoJogo.vitoriaTimerFrames = 145; // ~2.4s de ação e musiquinha antes de voltar ao lobby
+  estadoJogo.vitoriaTimerFrames = 145;
 
   soldado.vx = 0;
   soldado.vy = -5.5;
@@ -918,7 +1053,6 @@ function concluirFaseComVitoria(indiceFase) {
 function atualizarAcaoVitoriaFase() {
   estadoJogo.vitoriaTimerFrames--;
 
-  // Pulo comemorativo do soldado
   soldado.vy += GRAVIDADE * 0.6;
   soldado.y += soldado.vy;
   if (soldado.y + soldado.alturaAtual >= CHAO_Y) {
@@ -959,6 +1093,7 @@ function finalizarDerrota() {
   mensagemFim.textContent = "Sua energia chegou a zero. Tente novamente ou volte ao lobby.";
   pontuacaoFinalEl.textContent = estadoJogo.pontuacao;
   atualizarBarraLobbyUI();
+  esconderTodosOverlays();
   overlayFim.classList.remove("oculto");
 }
 
@@ -966,6 +1101,63 @@ function finalizarDerrota() {
 // 5. EVENTOS (APENAS addEventListener)
 // =========================================================
 function registrarEventos() {
+  overlayPressKey.addEventListener("click", function () {
+    iniciarIntroducaoJogo();
+  });
+
+  btnPularIntro.addEventListener("click", function () {
+    abrirMenuPrincipal("principal");
+  });
+
+  btnMenuRapido.addEventListener("click", function () {
+    if (estadoJogo.status === "menu") {
+      abrirLobby(estadoJogo.maiorFaseDesbloqueada);
+    } else if (estadoJogo.status !== "press_key" && estadoJogo.status !== "intro") {
+      abrirMenuPrincipal("principal");
+    }
+  });
+
+  btnLobbyMenu.addEventListener("click", function () {
+    abrirMenuPrincipal("principal");
+  });
+
+  btnMenuCampanha.addEventListener("click", function () {
+    abrirLobby(estadoJogo.maiorFaseDesbloqueada);
+  });
+
+  btnMenuControles.addEventListener("click", function () {
+    abrirMenuPrincipal("controles");
+  });
+
+  btnMenuOpcoes.addEventListener("click", function () {
+    abrirMenuPrincipal("opcoes");
+  });
+
+  btnMenuSair.addEventListener("click", function () {
+    abrirMenuPrincipal("sair");
+  });
+
+  btnVoltarMenuControles.addEventListener("click", function () {
+    abrirMenuPrincipal("principal");
+  });
+
+  btnVoltarMenuOpcoes.addEventListener("click", function () {
+    abrirMenuPrincipal("principal");
+  });
+
+  btnOpcaoSom.addEventListener("click", alternarSom);
+  btnOpcaoFullscreen.addEventListener("click", alternarTelaCheia);
+  btnFullscreen.addEventListener("click", alternarTelaCheia);
+
+  btnConfirmarSair.addEventListener("click", function () {
+    sairDoJogo();
+    irParaTelaPressKey();
+  });
+
+  btnCancelarSair.addEventListener("click", function () {
+    abrirMenuPrincipal("principal");
+  });
+
   btnReiniciar.addEventListener("click", function () {
     iniciarFase(estadoJogo.nivelIndice);
   });
@@ -1015,6 +1207,48 @@ function registrarEventos() {
 
   window.addEventListener("keydown", function (evento) {
     const codigo = evento.code;
+
+    if (estadoJogo.status === "press_key") {
+      if (["Space", "Enter", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(codigo)) {
+        evento.preventDefault();
+      }
+      if (!evento.repeat) {
+        iniciarIntroducaoJogo();
+      }
+      return;
+    }
+
+    if (estadoJogo.status === "intro") {
+      if (["Space", "Enter", "Escape"].includes(codigo)) {
+        evento.preventDefault();
+      }
+      if (!evento.repeat) {
+        abrirMenuPrincipal("principal");
+      }
+      return;
+    }
+
+    if (codigo === "Escape" && !evento.repeat) {
+      evento.preventDefault();
+      if (estadoJogo.status === "menu") {
+        if (!painelMenuOpcoes.classList.contains("oculto")) {
+          abrirLobby(estadoJogo.maiorFaseDesbloqueada);
+        } else {
+          abrirMenuPrincipal("principal");
+        }
+      } else if (estadoJogo.status === "lobby" || estadoJogo.status === "jogando") {
+        abrirMenuPrincipal("principal");
+      }
+      return;
+    }
+
+    if (estadoJogo.status === "menu") {
+      if (["Space", "Enter", "ArrowUp", "ArrowDown"].includes(codigo)) {
+        evento.preventDefault();
+      }
+      return;
+    }
+
     teclas[codigo] = true;
 
     if (codigo === "KeyM" && !evento.repeat) {
@@ -1291,7 +1525,6 @@ function atualizarSoldado() {
     estadoJogo.ultimoTiroFrame = estadoJogo.frameAtual;
   }
 
-  // Ao alcançar a meta de uma fase normal, celebra vitória e retorna ao lobby com a próxima desbloqueada
   if (configNivel.numero < NIVEIS.length && soldado.x + soldado.largura >= configNivel.distanciaMeta - 20) {
     estadoJogo.pontuacao += 200;
     concluirFaseComVitoria(estadoJogo.nivelIndice);
@@ -2091,7 +2324,7 @@ function atualizarHUD() {
   hudVida.textContent = soldado.vida;
   hudPontos.textContent = estadoJogo.pontuacao;
 
-  if (estadoJogo.status === "lobby") {
+  if (estadoJogo.status === "lobby" || estadoJogo.status === "menu" || estadoJogo.status === "press_key" || estadoJogo.status === "intro") {
     const pctDesbloqueio = Math.round(
       (estadoJogo.fasesConcluidas.length / NIVEIS.length) * 100
     );
@@ -2132,7 +2365,6 @@ function desenharBotaoSomCanvas() {
 }
 
 function desenharMapaLobbyCuphead() {
-  // Fundo estilizado estilo mapa retrô de Inkwell / Vanguarda
   const gradFundo = ctx.createLinearGradient(0, 0, 0, canvas.height);
   gradFundo.addColorStop(0, "#1d2a3a");
   gradFundo.addColorStop(0.55, "#2b3b2d");
@@ -2140,7 +2372,6 @@ function desenharMapaLobbyCuphead() {
   ctx.fillStyle = gradFundo;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Detalhes de relevo e vegetação do mapa
   ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
   ctx.beginPath();
   ctx.arc(190, 265, 115, 0, Math.PI * 2);
@@ -2148,7 +2379,6 @@ function desenharMapaLobbyCuphead() {
   ctx.arc(725, 265, 125, 0, Math.PI * 2);
   ctx.fill();
 
-  // Trilhas conectando os nós (Fase 1 -> Fase 2 -> Fase 3 Boss)
   for (let i = 0; i < NOS_LOBBY.length - 1; i++) {
     const origem = NOS_LOBBY[i];
     const destino = NOS_LOBBY[i + 1];
@@ -2175,7 +2405,6 @@ function desenharMapaLobbyCuphead() {
     ctx.restore();
   }
 
-  // Nós das fases no mapa
   const pulso = 1 + Math.sin(estadoJogo.frameAtual * 0.1) * 0.08;
   for (let i = 0; i < NOS_LOBBY.length; i++) {
     const no = NOS_LOBBY[i];
@@ -2211,7 +2440,6 @@ function desenharMapaLobbyCuphead() {
     ctx.textBaseline = "middle";
     ctx.fillText(desbloqueada ? (concluida ? "✔ OK" : no.rotuloCurto) : "🔒", no.x, no.y);
 
-    // Placa com nome da fase
     ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
     ctx.strokeStyle = desbloqueada ? "#f0b429" : "#475569";
     ctx.lineWidth = 1.5;
@@ -2235,10 +2463,8 @@ function desenharMapaLobbyCuphead() {
     ctx.restore();
   }
 
-  // Soldado andando pelo mapa do lobby
   desenharSoldado();
 
-  // Banner superior do mapa
   ctx.save();
   ctx.fillStyle = "rgba(15, 23, 42, 0.82)";
   ctx.strokeStyle = "#f0b429";
@@ -2255,7 +2481,6 @@ function desenharMapaLobbyCuphead() {
   ctx.fillText("MAPA DO LOBBY • Ande até a fase e aperte Enter/Espaço", 30, 28);
   ctx.restore();
 
-  // Prompt de entrada quando o soldado para sobre uma fase
   if (estadoJogo.faseNoNo >= 0) {
     const noAtual = NOS_LOBBY[estadoJogo.faseNoNo];
     const liberado = faseEstaDesbloqueada(noAtual.indice);
@@ -3138,6 +3363,16 @@ function desenharCena() {
     return;
   }
 
+  if (
+    estadoJogo.status === "press_key" ||
+    estadoJogo.status === "intro" ||
+    estadoJogo.status === "menu"
+  ) {
+    ctx.fillStyle = "#11161d";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    return;
+  }
+
   const configNivel = NIVEIS[estadoJogo.nivelIndice];
 
   if (configNivel.numero === 1) {
@@ -3303,5 +3538,5 @@ function loopPrincipal() {
 // Inicialização ao carregar o script
 registrarEventos();
 atualizarBotaoSomUI();
-abrirLobby(estadoJogo.maiorFaseDesbloqueada);
+irParaTelaPressKey();
 loopPrincipal();
