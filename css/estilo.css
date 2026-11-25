@@ -86,7 +86,7 @@ body {
 .overlay {
   position: absolute;
   inset: 0;
-  background-color: rgba(11, 15, 20, 0.86);
+  background-color: rgba(11, 15, 20, 0.88);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -101,14 +101,66 @@ body {
 }
 
 .overlay h2 {
-  font-size: 2rem;
+  font-size: 1.9rem;
   color: #f0b429;
 }
 
 .overlay p {
-  max-width: 520px;
+  max-width: 560px;
   color: #d9e2ec;
   line-height: 1.5;
+}
+
+.lobby-fases {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 660px;
+  margin: 4px 0 6px;
+}
+
+.btn-fase {
+  background-color: #1c2532;
+  border: 2px solid #2f3e52;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #e6edf3;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.12s ease;
+}
+
+.btn-fase:hover {
+  border-color: #f0b429;
+  background-color: #243041;
+}
+
+.btn-fase.ativo {
+  border-color: #f0b429;
+  background-color: rgba(240, 180, 41, 0.16);
+  transform: translateY(-2px);
+}
+
+.fase-tag {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #f0b429;
+  font-weight: bold;
+}
+
+.btn-fase strong {
+  font-size: 1rem;
+  color: #ffffff;
+}
+
+.btn-fase small {
+  font-size: 0.78rem;
+  color: #9fb3c8;
 }
 
 .placar-final {
@@ -163,4 +215,10 @@ body {
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 0.85rem;
+}
+
+@media (max-width: 600px) {
+  .lobby-fases {
+    grid-template-columns: 1fr;
+  }
 }

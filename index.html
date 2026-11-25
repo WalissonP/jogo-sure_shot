@@ -9,7 +9,7 @@
 <body>
   <header class="cabecalho">
     <h1>Operação Vanguarda</h1>
-    <p class="subtitulo">Avance pelos 5 setores, elimine as criaturas e derrote o Comandante Bélico!</p>
+    <p class="subtitulo">Escolha o setor no lobby, elimine as ameaças e derrote o Boss no Setor 3!</p>
   </header>
 
   <main class="container-principal">
@@ -17,7 +17,7 @@
     <section class="hud" aria-label="Status da partida">
       <div class="hud-item">
         <span class="hud-rotulo">Nível:</span>
-        <strong id="hud-nivel">1 / 5</strong>
+        <strong id="hud-nivel">1 / 3</strong>
       </div>
       <div class="hud-item">
         <span class="hud-rotulo">Vida:</span>
@@ -37,11 +37,30 @@
     <div class="palco-wrapper">
       <canvas id="tela-jogo" width="900" height="440"></canvas>
 
-      <!-- Tela inicial sobreposta -->
+      <!-- Lobby / Tela inicial sobreposta -->
       <div id="overlay-inicio" class="overlay">
-        <h2>Pronto para a Missão?</h2>
-        <p>Atravesse os 4 primeiros setores derrotando inimigos que evoluem a cada fase e enfrente o Boss no Nível 5.</p>
-        <button id="btn-iniciar" type="button" class="btn-primario">Iniciar Missão</button>
+        <h2>Lobby de Missão</h2>
+        <p>Selecione a fase que deseja jogar e inicie a operação:</p>
+
+        <div id="lobby-fases" class="lobby-fases" role="group" aria-label="Seleção de fase">
+          <button type="button" class="btn-fase ativo" data-fase="0">
+            <span class="fase-tag">Fase 1</span>
+            <strong>Ruínas</strong>
+            <small>Rastejadores e escombros</small>
+          </button>
+          <button type="button" class="btn-fase" data-fase="1">
+            <span class="fase-tag">Fase 2</span>
+            <strong>Trincheiras</strong>
+            <small>Saltadores, atiradores e drones</small>
+          </button>
+          <button type="button" class="btn-fase" data-fase="2">
+            <span class="fase-tag">Fase 3</span>
+            <strong>Núcleo do Boss</strong>
+            <small>Confronto contra o Boss</small>
+          </button>
+        </div>
+
+        <button id="btn-iniciar" type="button" class="btn-primario">Iniciar Fase 1</button>
       </div>
 
       <!-- Tela de fim de partida (Vitória ou Derrota) -->
@@ -62,6 +81,7 @@
         <li><strong>S</strong> ou <strong>↓</strong> (segurar): Agachar (desvia de tiros altos)</li>
         <li><strong>Espaço</strong>: Pular sobre obstáculos e plataformas</li>
         <li><strong>J</strong> ou <strong>Z</strong>: Atirar (para frente ou para cima)</li>
+        <li><strong>M</strong>: Alternar som (mudo / ativo)</li>
         <li><strong>R</strong>: Reiniciar partida a qualquer momento</li>
       </ul>
     </section>
