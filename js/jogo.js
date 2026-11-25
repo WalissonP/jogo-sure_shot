@@ -93,6 +93,8 @@ const estadoJogo = {
   plataformas: [],
   estruturasQuebradas: [],
   obstaculos: [],
+  buracosChao: [],
+  caminhosSubterraneos: [],
   itensChao: [],
   inimigos: [],
   particulasDano: [],
@@ -136,6 +138,8 @@ function iniciarPartida() {
   estadoJogo.pulsoTelaDano = 0;
   estadoJogo.inclinacaoDano = 0;
   estadoJogo.particulasDano = [];
+  estadoJogo.buracosChao = [];
+  estadoJogo.caminhosSubterraneos = [];
 
   soldado.vida = soldado.vidaMaxima;
   soldado.direcao = 1;
@@ -157,6 +161,8 @@ function carregarNivel(indice) {
   estadoJogo.inimigos = [];
   estadoJogo.obstaculos = [];
   estadoJogo.estruturasQuebradas = [];
+  estadoJogo.buracosChao = [];
+  estadoJogo.caminhosSubterraneos = [];
   estadoJogo.itensChao = [];
   estadoJogo.particulasDano = [];
   estadoJogo.tirosJogador = [];
@@ -213,7 +219,6 @@ function carregarNivel(indice) {
 }
 
 function configurarMapaFase1(distanciaMeta) {
-  // Plataformas ocasionais feitas de pedaços de prédio que desmoronam 2s após pisar
   const posicoesPlataformas = [470, 1180, 1760];
   for (let i = 0; i < posicoesPlataformas.length; i++) {
     const px = posicoesPlataformas[i];
@@ -232,7 +237,6 @@ function configurarMapaFase1(distanciaMeta) {
     });
   }
 
-  // Escombros sólidos no chão (rastejadores cavam por baixo deles)
   const posicoesEscombros = [390, 840, 1460, 1920];
   for (let i = 0; i < posicoesEscombros.length; i++) {
     const obsX = posicoesEscombros[i];
@@ -245,7 +249,6 @@ function configurarMapaFase1(distanciaMeta) {
     });
   }
 
-  // Prédios quebrados com abertura baixa: só dá pra passar deitado
   const posicoesPredios = [660, 1580];
   for (let i = 0; i < posicoesPredios.length; i++) {
     const bx = posicoesPredios[i];
@@ -254,7 +257,7 @@ function configurarMapaFase1(distanciaMeta) {
       y: CHAO_Y - 135,
       largura: 110,
       alturaTotal: 135,
-      alturaPassagem: 34 // Vão livre do chão até a viga baixa (soldado em pé tem 56, deitado tem 20)
+      alturaPassagem: 34
     });
   }
 }
@@ -285,7 +288,12 @@ function criarRastejador(x, alcance = 250, velocidadeAtaque = 1.5, indice = 0) {
     vy: 0,
     vida: 1,
     pontos: 60,
-    estado: "esperando", // "esperando" | "atacando" | "cavando"
+    estado: "esperando", // "esperando" | "atacando" | "saltando_mergulho" | "mergulhando" | "subterraneo" | "saindo_terra"
+    obstaculoAlvo: null,
+    buracoEntradaId: null,
+    caminhoId: null,
+    rastroPulo: [],
+    ocultoNaTerra: false,
     alcanceAtaque: alcance,
     velocidadeAtaque: velocidadeAtaque,
     direcaoOlhar: -1,
@@ -385,7 +393,6 @@ function atualizarPlataformas() {
 }
 
 function obterBlocoPassagemBaixa(estrutura) {
-  // Bloco superior que deixa apenas `alturaPassagem` livre rente ao chão
   const alturaBlocoSuperior = Math.max(20, estrutura.alturaTotal - estrutura.alturaPassagem);
   return {
     x: estrutura.x + 12,
@@ -393,6 +400,22 @@ function obterBlocoPassagemBaixa(estrutura) {
     largura: estrutura.largura - 24,
     altura: alturaBlocoSuperior
   };
+}
+
+function resolverColisaoHorizontal(caixaAtual, xAnterior, bloco) {
+  if (!colidiu(caixaAtual, bloco)) return false;
+
+  if (xAnterior + soldado.largura <= bloco.x + 6) {
+    soldado.x = bloco.x - soldado.largura;
+    soldado.vx = 0;
+    return true;
+  }
+  if (xAnterior >= bloco.x + bloco.largura - 6) {
+    soldado.x = bloco.x + bloco.largura;
+    soldado.vx = 0;
+    return true;
+  }
+  return false;
 }
 
 function atualizarSoldado() {
@@ -405,7 +428,6 @@ function atualizarSoldado() {
 
   const querDeitar = Boolean(baixo && soldado.noChao);
 
-  // Impede levantar se houver um teto baixo de prédio quebrado logo acima da cabeça
   let bloqueadoParaLevantar = false;
   if (!querDeitar && soldado.deitado) {
     const xCentro = soldado.x + soldado.largura / 2;
@@ -472,7 +494,6 @@ function atualizarSoldado() {
   const yAnterior = soldado.y;
   soldado.x += soldado.vx;
 
-  // Colisão horizontal contra o vão superior do prédio quebrado (só passa deitado)
   for (let i = 0; i < estadoJogo.estruturasQuebradas.length; i++) {
     const blocoAlto = obterBlocoPassagemBaixa(estadoJogo.estruturasQuebradas[i]);
     const caixaAtual = {
@@ -481,16 +502,18 @@ function atualizarSoldado() {
       largura: soldado.largura,
       altura: soldado.alturaAtual
     };
+    resolverColisaoHorizontal(caixaAtual, xAnterior, blocoAlto);
+  }
 
-    if (colidiu(caixaAtual, blocoAlto)) {
-      if (xAnterior + soldado.largura <= blocoAlto.x + 4) {
-        soldado.x = blocoAlto.x - soldado.largura;
-        soldado.vx = 0;
-      } else if (xAnterior >= blocoAlto.x + blocoAlto.largura - 4) {
-        soldado.x = blocoAlto.x + blocoAlto.largura;
-        soldado.vx = 0;
-      }
-    }
+  for (let i = 0; i < estadoJogo.obstaculos.length; i++) {
+    const obs = estadoJogo.obstaculos[i];
+    const caixaAtual = {
+      x: soldado.x,
+      y: soldado.y,
+      largura: soldado.largura,
+      altura: soldado.alturaAtual
+    };
+    resolverColisaoHorizontal(caixaAtual, xAnterior, obs);
   }
 
   soldado.vy += GRAVIDADE;
@@ -529,7 +552,7 @@ function atualizarSoldado() {
     const obs = estadoJogo.obstaculos[i];
     const dentroX = soldado.x + soldado.largura > obs.x && soldado.x < obs.x + obs.largura;
     const cruzouTopo =
-      yAnterior + soldado.alturaAtual <= obs.y + 4 &&
+      yAnterior + soldado.alturaAtual <= obs.y + 6 &&
       soldado.y + soldado.alturaAtual >= obs.y;
 
     if (soldado.vy >= 0 && dentroX && cruzouTopo) {
@@ -620,7 +643,7 @@ function dispararTiroSoldado() {
 }
 
 // =========================================================
-// 7. INIMIGOS E BOSS
+// 7. INIMIGOS, BURACOS, CAMINHO SUBTERRÂNEO EM "U" E BOSS
 // =========================================================
 function gerarInimigos() {
   const configNivel = NIVEIS[estadoJogo.nivelIndice];
@@ -702,21 +725,175 @@ function gerarInimigos() {
   }
 }
 
-function haObstaculoAFrente(inimigo, dir) {
-  const proximoX = dir === 1 ? inimigo.x + inimigo.largura + 6 : inimigo.x - 6;
+function encontrarObstaculoAFrente(inimigo, dir) {
+  const proximoX = dir === 1 ? inimigo.x + inimigo.largura + 18 : inimigo.x - 32;
   const caixaFrente = {
     x: proximoX,
-    y: CHAO_Y - 24,
-    largura: 10,
-    altura: 24
+    y: CHAO_Y - 26,
+    largura: 32,
+    altura: 26
   };
 
   for (let i = 0; i < estadoJogo.obstaculos.length; i++) {
     if (colidiu(caixaFrente, estadoJogo.obstaculos[i])) {
-      return true;
+      return estadoJogo.obstaculos[i];
     }
   }
-  return false;
+  return null;
+}
+
+function criarBuracoNoSolo(xPos, larguraCorpo, fechandoDesdeInicio = false, duracaoFrames = 140) {
+  const id = estadoJogo.frameAtual * 1000 + Math.floor(Math.random() * 999);
+  estadoJogo.buracosChao.push({
+    id: id,
+    x: xPos,
+    larguraInicial: larguraCorpo,
+    largura: larguraCorpo,
+    vidaMax: duracaoFrames,
+    vida: duracaoFrames,
+    fechando: fechandoDesdeInicio
+  });
+  return id;
+}
+
+function gerarMonticulosFormigueiro(xCentro, larguraFaixa, seedOffset = 0) {
+  const montes = [];
+  const quantidade = 18;
+  for (let m = 0; m < quantidade; m++) {
+    const s = seedOffset + m * 37.7;
+    const frac = m / Math.max(1, quantidade - 1);
+    const dx = (frac - 0.5) * larguraFaixa + Math.sin(s) * 4;
+    const raioX = 2.2 + ((m * 13) % 5) * 0.85;
+    const raioY = 1.6 + ((m * 7) % 4) * 0.7;
+    const deslocY = ((m * 11) % 7) - 2;
+    const cores = ["#4a321e", "#6b492b", "#8c6239", "#a47548"];
+    montes.push({
+      dx: dx,
+      dy: deslocY,
+      rx: raioX,
+      ry: raioY,
+      cor: cores[m % cores.length]
+    });
+  }
+  return montes;
+}
+
+function criarCaminhoSubterraneo(xEntrada, xSaida, dir, profundidadeMax = 28) {
+  const id = estadoJogo.frameAtual * 1000 + Math.floor(Math.random() * 999);
+  const distanciaHoriz = Math.abs(xSaida - xEntrada);
+  estadoJogo.caminhosSubterraneos.push({
+    id: id,
+    xEntrada: xEntrada,
+    xSaida: xSaida,
+    xAtual: xEntrada,
+    dir: dir,
+    progressoU: 0, // 0 = entrada, 0.5 = fundo do U, 1 = saída
+    profundidadeMax: profundidadeMax,
+    monticulos: gerarMonticulosFormigueiro(
+      (xEntrada + xSaida) / 2,
+      Math.max(36, distanciaHoriz + 26),
+      id
+    ),
+    ativo: true,
+    vida: 120,
+    vidaMax: 120
+  });
+  return id;
+}
+
+function calcularPontoCurvaU(caminho, t) {
+  const tClamped = Math.max(0, Math.min(1, t));
+  const x = caminho.xEntrada + (caminho.xSaida - caminho.xEntrada) * tClamped;
+  const y = CHAO_Y + caminho.profundidadeMax * Math.sin(Math.PI * tClamped);
+  return { x, y };
+}
+
+function atualizarCaminhosSubterraneos() {
+  for (let i = estadoJogo.caminhosSubterraneos.length - 1; i >= 0; i--) {
+    const cam = estadoJogo.caminhosSubterraneos[i];
+    if (!cam.ativo) {
+      cam.vida--;
+      if (cam.vida <= 0) {
+        estadoJogo.caminhosSubterraneos.splice(i, 1);
+      }
+    }
+  }
+}
+
+function atualizarBuracosChao() {
+  for (let i = estadoJogo.buracosChao.length - 1; i >= 0; i--) {
+    const buraco = estadoJogo.buracosChao[i];
+    if (!buraco.fechando) continue;
+
+    buraco.vida--;
+    const proporcao = Math.max(0, buraco.vida / buraco.vidaMax);
+    const novaLargura = buraco.larguraInicial * proporcao;
+    const deltaLargura = buraco.largura - novaLargura;
+    buraco.x += deltaLargura / 2;
+    buraco.largura = novaLargura;
+
+    if (buraco.vida <= 0 || buraco.largura <= 2) {
+      estadoJogo.buracosChao.splice(i, 1);
+    }
+  }
+}
+
+function obterPosicaoCabecaRastejador(inimigo) {
+  const dir = inimigo.direcaoOlhar || -1;
+  return {
+    x: inimigo.x + inimigo.largura / 2 + dir * 14,
+    y: inimigo.y + inimigo.altura - 12
+  };
+}
+
+function registrarPontoArcoPulo(inimigo) {
+  const cabeca = obterPosicaoCabecaRastejador(inimigo);
+  inimigo.rastroPulo.unshift({
+    x: cabeca.x,
+    y: cabeca.y,
+    vx: inimigo.vx,
+    vy: inimigo.vy
+  });
+  if (inimigo.rastroPulo.length > 70) {
+    inimigo.rastroPulo.pop();
+  }
+}
+
+function inicializarRastroArcoPulo(inimigo) {
+  inimigo.rastroPulo = [];
+  const cabeca = obterPosicaoCabecaRastejador(inimigo);
+  const dir = inimigo.direcaoOlhar || -1;
+  for (let k = 0; k < 50; k++) {
+    inimigo.rastroPulo.push({
+      x: cabeca.x - dir * k * 1.1,
+      y: CHAO_Y - 10,
+      vx: inimigo.vx,
+      vy: 0
+    });
+  }
+}
+
+function iniciarEscavacaoEntrada(inimigo) {
+  const obsAFrente = inimigo.obstaculoAlvo;
+  const cabeca = obterPosicaoCabecaRastejador(inimigo);
+  const xEntrada = obsAFrente
+    ? inimigo.direcaoOlhar === 1
+      ? obsAFrente.x - 10
+      : obsAFrente.x + obsAFrente.largura + 10
+    : cabeca.x;
+  const xSaida = obsAFrente
+    ? inimigo.direcaoOlhar === 1
+      ? obsAFrente.x + obsAFrente.largura + 12
+      : obsAFrente.x - 12
+    : xEntrada + inimigo.direcaoOlhar * 68;
+
+  inimigo.buracoEntradaId = criarBuracoNoSolo(
+    xEntrada - 14,
+    28,
+    true,
+    140
+  );
+  inimigo.caminhoId = criarCaminhoSubterraneo(xEntrada, xSaida, inimigo.direcaoOlhar, 26);
 }
 
 function atualizarInimigos() {
@@ -737,48 +914,152 @@ function atualizarInimigos() {
         inimigo.estado = "atacando";
       }
 
-      if (inimigo.estado === "atacando" || inimigo.estado === "cavando") {
+      if (inimigo.estado === "atacando") {
+        inimigo.ocultoNaTerra = false;
+        inimigo.vy = 0;
         inimigo.direcaoOlhar = distanciaX >= 0 ? 1 : -1;
-        const obstaculoFrente = haObstaculoAFrente(inimigo, inimigo.direcaoOlhar);
+        const obsAFrente = encontrarObstaculoAFrente(inimigo, inimigo.direcaoOlhar);
 
-        if (obstaculoFrente) {
-          inimigo.estado = "cavando";
-        } else if (inimigo.estado === "cavando") {
-          inimigo.estado = "atacando";
+        if (obsAFrente) {
+          // Salta formando um "U" invertido com o corpo até mergulhar de cabeça antes do obstáculo
+          inimigo.estado = "saltando_mergulho";
+          inimigo.obstaculoAlvo = obsAFrente;
+          inimigo.ocultoNaTerra = false;
+          inimigo.vx = inimigo.direcaoOlhar * 1.35;
+          inimigo.vy = -8.6;
+          inicializarRastroArcoPulo(inimigo);
+          inimigo.x += inimigo.vx;
+          inimigo.y += inimigo.vy;
+          registrarPontoArcoPulo(inimigo);
+        } else {
+          inimigo.vx = inimigo.direcaoOlhar * inimigo.velocidadeAtaque;
+          inimigo.x += inimigo.vx;
+          const onda = Math.sin(estadoJogo.frameAtual * 0.16 + inimigo.faseCobra);
+          inimigo.y = CHAO_Y - inimigo.altura - Math.abs(onda) * 2.5;
         }
-
-        const velAtual =
-          inimigo.estado === "cavando"
-            ? inimigo.velocidadeAtaque * 0.85
-            : inimigo.velocidadeAtaque;
-
-        inimigo.vx = inimigo.direcaoOlhar * velAtual;
+      } else if (inimigo.estado === "saltando_mergulho") {
+        inimigo.vy += GRAVIDADE * 0.85;
         inimigo.x += inimigo.vx;
+        inimigo.y += inimigo.vy;
+        registrarPontoArcoPulo(inimigo);
 
-        if (inimigo.estado === "cavando" && estadoJogo.frameAtual % 6 === 0) {
+        const cabeca = obterPosicaoCabecaRastejador(inimigo);
+        if (inimigo.vy > 0 && cabeca.y >= CHAO_Y - 2) {
+          inimigo.estado = "mergulhando";
+          iniciarEscavacaoEntrada(inimigo);
+        }
+      } else if (inimigo.estado === "mergulhando") {
+        inimigo.vy += GRAVIDADE * 0.85;
+        inimigo.x += inimigo.vx;
+        inimigo.y += inimigo.vy;
+        registrarPontoArcoPulo(inimigo);
+
+        if (estadoJogo.frameAtual % 2 === 0) {
+          const buracoAtual = estadoJogo.buracosChao.find((b) => b.id === inimigo.buracoEntradaId);
+          const xTerra = buracoAtual
+            ? buracoAtual.x + buracoAtual.largura / 2
+            : inimigo.x + inimigo.largura / 2;
+
           estadoJogo.particulasDano.push({
-            x: inimigo.x + inimigo.largura / 2 + inimigo.direcaoOlhar * 10,
-            y: CHAO_Y,
-            vx: -inimigo.direcaoOlhar * (1 + Math.random() * 2),
-            vy: -2.2 - Math.random() * 2,
-            vida: 12 + Math.floor(Math.random() * 8),
-            tamanho: 2.5 + Math.random() * 2.5,
-            cor: Math.random() < 0.5 ? "#7f5539" : "#b08968"
+            x: xTerra,
+            y: CHAO_Y - 1,
+            vx: -inimigo.direcaoOlhar * (1.2 + Math.random() * 2.0),
+            vy: -2.4 - Math.random() * 2.0,
+            vida: 13 + Math.floor(Math.random() * 6),
+            tamanho: 2.2 + Math.random() * 2.2,
+            cor: Math.random() < 0.5 ? "#5c4028" : "#9c6644"
           });
         }
-      } else {
-        inimigo.vx = 0;
-        inimigo.direcaoOlhar = distanciaX >= 0 ? 1 : -1;
-      }
 
-      if (inimigo.estado === "cavando") {
-        const ondaCava = Math.sin(estadoJogo.frameAtual * 0.28 + inimigo.faseCobra);
-        inimigo.y = CHAO_Y - inimigo.altura + 8 + ondaCava * 2;
+        // Só oculta totalmente quando a cauda (último ponto do rastro) também já entrou em CHAO_Y
+        const ultimoPonto =
+          inimigo.rastroPulo[Math.min(inimigo.rastroPulo.length - 1, 24)] ||
+          obterPosicaoCabecaRastejador(inimigo);
+        if (ultimoPonto.y >= CHAO_Y + 6) {
+          inimigo.ocultoNaTerra = true;
+          inimigo.rastroPulo = [];
+          inimigo.estado = "subterraneo";
+        }
+      } else if (inimigo.estado === "subterraneo") {
+        inimigo.ocultoNaTerra = true;
+        const caminho = estadoJogo.caminhosSubterraneos.find((c) => c.id === inimigo.caminhoId);
+
+        if (caminho) {
+          const distanciaHoriz = Math.max(40, Math.abs(caminho.xSaida - caminho.xEntrada));
+          const passoT = (inimigo.velocidadeAtaque * 1.35) / distanciaHoriz;
+          caminho.progressoU = Math.min(1, caminho.progressoU + passoT);
+
+          const pontoU = calcularPontoCurvaU(caminho, caminho.progressoU);
+          caminho.xAtual = pontoU.x;
+          inimigo.x = pontoU.x - inimigo.largura / 2;
+          inimigo.y = pontoU.y;
+
+          if (estadoJogo.frameAtual % 5 === 0) {
+            estadoJogo.particulasDano.push({
+              x: pontoU.x + (Math.random() - 0.5) * 8,
+              y: CHAO_Y - 1,
+              vx: (Math.random() - 0.5) * 1.6,
+              vy: -1.4 - Math.random() * 1.5,
+              vida: 10 + Math.floor(Math.random() * 6),
+              tamanho: 1.8 + Math.random() * 1.8,
+              cor: "#7f5539"
+            });
+          }
+
+          if (caminho.progressoU >= 1) {
+            caminho.ativo = false;
+            const xSaida = caminho.xSaida;
+            inimigo.x = xSaida - inimigo.largura / 2;
+            criarBuracoNoSolo(
+              xSaida - 14,
+              28,
+              true,
+              140
+            );
+
+            inimigo.ocultoNaTerra = false;
+            inimigo.estado = "saindo_terra";
+            inimigo.y = CHAO_Y - 6;
+            inimigo.vy = -8.5;
+            inimigo.obstaculoAlvo = null;
+            inimigo.buracoEntradaId = null;
+            inimigo.caminhoId = null;
+
+            for (let p = 0; p < 9; p++) {
+              estadoJogo.particulasDano.push({
+                x: xSaida,
+                y: CHAO_Y - 1,
+                vx: (Math.random() - 0.5) * 3.6,
+                vy: -3.2 - Math.random() * 2.5,
+                vida: 15 + Math.floor(Math.random() * 8),
+                tamanho: 2.5 + Math.random() * 2.2,
+                cor: p % 2 === 0 ? "#8c6239" : "#b08968"
+              });
+            }
+          }
+        } else {
+          inimigo.ocultoNaTerra = false;
+          inimigo.estado = "atacando";
+        }
+      } else if (inimigo.estado === "saindo_terra") {
+        inimigo.ocultoNaTerra = false;
+        inimigo.x += inimigo.direcaoOlhar * (inimigo.velocidadeAtaque * 0.9);
+        inimigo.vy += GRAVIDADE * 0.85;
+        inimigo.y += inimigo.vy;
+
+        const chaoSuperficie = CHAO_Y - inimigo.altura;
+        if (inimigo.vy >= 0 && inimigo.y >= chaoSuperficie) {
+          inimigo.y = chaoSuperficie;
+          inimigo.vy = 0;
+          inimigo.estado = "atacando";
+        }
       } else {
-        const frequencia = inimigo.estado === "atacando" ? 0.16 : 0.1;
-        const amplitude = inimigo.estado === "atacando" ? 2.5 : 1.5;
-        const onda = Math.sin(estadoJogo.frameAtual * frequencia + inimigo.faseCobra);
-        inimigo.y = CHAO_Y - inimigo.altura - Math.abs(onda) * amplitude;
+        inimigo.ocultoNaTerra = false;
+        inimigo.vx = 0;
+        inimigo.vy = 0;
+        inimigo.direcaoOlhar = distanciaX >= 0 ? 1 : -1;
+        const onda = Math.sin(estadoJogo.frameAtual * 0.1 + inimigo.faseCobra);
+        inimigo.y = CHAO_Y - inimigo.altura - Math.abs(onda) * 1.5;
       }
     } else {
       inimigo.x += inimigo.vx;
@@ -810,7 +1091,11 @@ function atualizarInimigos() {
       inimigo.ultimoTiro = estadoJogo.frameAtual;
     }
 
-    if (colidiu(soldado, inimigo)) {
+    if (
+      !inimigo.ocultoNaTerra &&
+      inimigo.estado !== "mergulhando" &&
+      colidiu(soldado, inimigo)
+    ) {
       const direcaoImpacto =
         soldado.x + soldado.largura / 2 < inimigo.x + inimigo.largura / 2 ? -1 : 1;
       aplicarDanoSoldado(15, direcaoImpacto);
@@ -868,6 +1153,8 @@ function atualizarProjeteis() {
 
     for (let j = estadoJogo.inimigos.length - 1; j >= 0; j--) {
       const inimigo = estadoJogo.inimigos[j];
+      if (inimigo.ocultoNaTerra || inimigo.estado === "mergulhando") continue;
+
       if (colidiu(tiro, inimigo)) {
         if (inimigo.tipo === "rastejador" && tiro.nivelTiro !== "baixo") {
           continue;
@@ -1023,17 +1310,129 @@ function atualizarHUD() {
   }
 }
 
+function desenharCaminhosSubterraneos() {
+  for (let i = 0; i < estadoJogo.caminhosSubterraneos.length; i++) {
+    const cam = estadoJogo.caminhosSubterraneos[i];
+    const alfa = cam.ativo ? 1 : Math.max(0, cam.vida / cam.vidaMax);
+    const maxT = cam.ativo ? cam.progressoU : 1;
+    const passos = Math.max(8, Math.floor(maxT * 28));
+
+    ctx.save();
+    ctx.globalAlpha = alfa;
+
+    // 1. Caminho curvo em "U" dentro da terra
+    ctx.strokeStyle = "#140d07";
+    ctx.lineWidth = 11;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    for (let s = 0; s <= passos; s++) {
+      const t = (s / passos) * maxT;
+      const pt = calcularPontoCurvaU(cam, t);
+      if (s === 0) ctx.moveTo(pt.x, pt.y);
+      else ctx.lineTo(pt.x, pt.y);
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = "#5c4028";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let s = 0; s <= passos; s++) {
+      const t = (s / passos) * maxT;
+      const pt = calcularPontoCurvaU(cam, t);
+      if (s === 0) ctx.moveTo(pt.x, pt.y + 4);
+      else ctx.lineTo(pt.x, pt.y + 4);
+    }
+    ctx.stroke();
+
+    // 2. Rastro de terra escavada tipo formigueiro na superfície do solo
+    const centroFormigueiroX = (cam.xEntrada + cam.xSaida) / 2;
+    const visibilidadeMonticulos = Math.min(1, maxT * 1.4);
+
+    for (let m = 0; m < cam.monticulos.length; m++) {
+      const mt = cam.monticulos[m];
+      const mx = centroFormigueiroX + mt.dx * visibilidadeMonticulos;
+      const my = CHAO_Y + mt.dy;
+
+      ctx.fillStyle = mt.cor;
+      ctx.beginPath();
+      ctx.ellipse(mx, my, mt.rx, mt.ry, 0, Math.PI, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 3. Terra revolvida avançando junto com o ponto atual do "U"
+    if (cam.ativo) {
+      const ponta = calcularPontoCurvaU(cam, cam.progressoU);
+      const tremor = Math.sin(estadoJogo.frameAtual * 0.55) * 1.8;
+
+      ctx.fillStyle = "#8c6239";
+      ctx.beginPath();
+      ctx.arc(ponta.x + tremor, ponta.y, 6.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#b08968";
+      ctx.beginPath();
+      ctx.arc(ponta.x - tremor * 0.6, ponta.y - 2, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+}
+
+function desenharBuracosChao() {
+  for (let i = 0; i < estadoJogo.buracosChao.length; i++) {
+    const buraco = estadoJogo.buracosChao[i];
+    const proporcao = Math.max(0, buraco.vida / buraco.vidaMax);
+    const raioX = Math.max(1.5, buraco.largura / 2);
+    const raioY = Math.max(1.5, 6 * proporcao);
+    const centroX = buraco.x + buraco.largura / 2;
+
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, proporcao * 1.2);
+
+    ctx.fillStyle = "#5c4028";
+    ctx.beginPath();
+    ctx.moveTo(centroX - raioX - 10 * proporcao, CHAO_Y + 2);
+    ctx.quadraticCurveTo(
+      centroX - raioX * 0.6,
+      CHAO_Y - 9 * proporcao,
+      centroX,
+      CHAO_Y - 5 * proporcao
+    );
+    ctx.quadraticCurveTo(
+      centroX + raioX * 0.6,
+      CHAO_Y - 10 * proporcao,
+      centroX + raioX + 10 * proporcao,
+      CHAO_Y + 2
+    );
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#8c6239";
+    ctx.beginPath();
+    ctx.arc(centroX - raioX * 0.7, CHAO_Y - 3 * proporcao, 3.5 * proporcao, 0, Math.PI * 2);
+    ctx.arc(centroX + raioX * 0.75, CHAO_Y - 3.5 * proporcao, 3 * proporcao, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#140f0a";
+    ctx.beginPath();
+    ctx.ellipse(centroX, CHAO_Y + 2, raioX, raioY, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+}
+
 function desenharEstruturasQuebradas() {
   for (let i = 0; i < estadoJogo.estruturasQuebradas.length; i++) {
     const est = estadoJogo.estruturasQuebradas[i];
     const blocoAlto = obterBlocoPassagemBaixa(est);
 
-    // Pilares laterais quebrados
     ctx.fillStyle = "#48443d";
     ctx.fillRect(est.x, est.y + 16, 14, est.alturaTotal - 16);
     ctx.fillRect(est.x + est.largura - 14, est.y + 28, 14, est.alturaTotal - 28);
 
-    // Topo quebrado do prédio
     ctx.fillStyle = "#36332e";
     ctx.beginPath();
     ctx.moveTo(est.x, est.y + 16);
@@ -1046,13 +1445,11 @@ function desenharEstruturasQuebradas() {
     ctx.closePath();
     ctx.fill();
 
-    // Laje / viga superior que cria o buraco rente ao chão
     ctx.fillStyle = "#5a544a";
     ctx.fillRect(blocoAlto.x, blocoAlto.y, blocoAlto.largura, blocoAlto.altura);
     ctx.fillStyle = "#787064";
     ctx.fillRect(blocoAlto.x, blocoAlto.y + blocoAlto.altura - 5, blocoAlto.largura, 5);
 
-    // Ferragens expostas na borda inferior do vão
     ctx.strokeStyle = "#8c4a27";
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -1170,7 +1567,6 @@ function desenharPlataformas(configNivel) {
         ctx.translate(-(px + plat.largura / 2), -(plat.y + plat.altura / 2));
       }
 
-      // Pedaço de laje / prédio quebrado
       ctx.fillStyle = plat.pisada && !plat.desmoronando ? "#7a6855" : "#615b52";
       ctx.beginPath();
       ctx.moveTo(px, plat.y + 3);
@@ -1182,7 +1578,6 @@ function desenharPlataformas(configNivel) {
       ctx.closePath();
       ctx.fill();
 
-      // Detalhe de concreto e rachadura
       ctx.fillStyle = "#423d36";
       ctx.fillRect(px + 14, plat.y + 7, 22, 6);
       ctx.fillRect(px + plat.largura - 36, plat.y + 8, 18, 5);
@@ -1199,24 +1594,116 @@ function desenharPlataformas(configNivel) {
 }
 
 function desenharRastejadorAlien(inimigo) {
-  const cavando = inimigo.estado === "cavando";
-  const baseY = inimigo.y + inimigo.altura;
-  const freq = cavando ? 0.24 : inimigo.estado === "atacando" ? 0.18 : 0.12;
-  const tempo = estadoJogo.frameAtual * freq + inimigo.faseCobra;
+  if (inimigo.ocultoNaTerra) return;
+
+  const saltandoMergulho = inimigo.estado === "saltando_mergulho";
+  const mergulhando = inimigo.estado === "mergulhando";
+  const saindo = inimigo.estado === "saindo_terra";
   const dir = inimigo.direcaoOlhar || -1;
   const emDano = inimigo.danoFrames > 0;
   const tremorDano = emDano ? Math.sin(estadoJogo.frameAtual * 1.4) * 3.5 : 0;
 
   ctx.save();
+
+  // Durante o salto em arco e o mergulho, cada segmento segue a parábola formando um "U" de cabeça para baixo
+  if ((saltandoMergulho || mergulhando) && inimigo.rastroPulo.length > 0) {
+    ctx.beginPath();
+    ctx.rect(
+      estadoJogo.cameraX - 80,
+      -80,
+      canvas.width + 160,
+      CHAO_Y + 80
+    );
+    ctx.clip();
+
+    const segmentos = 6;
+    const espacoIndices = 4;
+
+    for (let s = segmentos; s >= 1; s--) {
+      const idx = Math.min(inimigo.rastroPulo.length - 1, s * espacoIndices);
+      const pt = inimigo.rastroPulo[idx];
+      const ptFrente = inimigo.rastroPulo[Math.max(0, idx - 2)];
+      const tangenteAngulo = Math.atan2(ptFrente.y - pt.y, ptFrente.x - pt.x);
+      const normalX = Math.sin(tangenteAngulo);
+      const normalY = -Math.cos(tangenteAngulo);
+      const proporcao = s / segmentos;
+      const raio = Math.max(3.5, 9 * (1 - proporcao * 0.55));
+
+      ctx.fillStyle = emDano
+        ? s % 2 === 0
+          ? "#ffffff"
+          : "#ff6b6b"
+        : s % 2 === 0
+        ? "#9c6644"
+        : "#7f5539";
+      ctx.beginPath();
+      ctx.arc(pt.x + tremorDano, pt.y, raio, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Espinho dorsal acompanhando a curvatura do "U" invertido
+      ctx.fillStyle = emDano ? "#ffd43b" : "#c8553d";
+      ctx.beginPath();
+      ctx.moveTo(
+        pt.x + tremorDano + normalX * raio - Math.cos(tangenteAngulo) * 2,
+        pt.y + normalY * raio - Math.sin(tangenteAngulo) * 2
+      );
+      ctx.lineTo(
+        pt.x + tremorDano + normalX * (raio + 4.5 * (1 - proporcao * 0.4)),
+        pt.y + normalY * (raio + 4.5 * (1 - proporcao * 0.4))
+      );
+      ctx.lineTo(
+        pt.x + tremorDano + normalX * raio + Math.cos(tangenteAngulo) * 2,
+        pt.y + normalY * raio + Math.sin(tangenteAngulo) * 2
+      );
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Cabeça na ponta frontal do arco mergulhando
+    const ptCabeca = inimigo.rastroPulo[0];
+    const anguloCabeca = Math.atan2(ptCabeca.vy, ptCabeca.vx);
+
+    ctx.save();
+    ctx.translate(ptCabeca.x + tremorDano, ptCabeca.y);
+    ctx.rotate(anguloCabeca);
+    ctx.scale(-1, dir === 1 ? 1 : -1);
+
+    ctx.fillStyle = emDano ? "#ffffff" : "#b08968";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 11, 8.5, -0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#ede0d4";
+    ctx.beginPath();
+    ctx.moveTo(-8, 3);
+    ctx.lineTo(-12, 8);
+    ctx.lineTo(-5, 5);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = emDano ? "#ff2a55" : "#e03131";
+    ctx.beginPath();
+    ctx.arc(-2, -3, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#111417";
+    ctx.fillRect(-2.5, -5, 1.5, 4);
+
+    ctx.restore();
+    ctx.restore();
+    return;
+  }
+
+  const baseY = inimigo.y + inimigo.altura;
+  const freq = inimigo.estado === "atacando" ? 0.18 : 0.12;
+  const tempo = estadoJogo.frameAtual * freq + inimigo.faseCobra;
+
   const centroX = inimigo.x + inimigo.largura / 2 + tremorDano;
   ctx.translate(centroX, baseY);
   ctx.scale(-dir, 1);
 
-  if (cavando) {
-    // Recorta o corpo abaixo da linha do chão para dar efeito de escavação
-    ctx.beginPath();
-    ctx.rect(-50, -50, 100, 50 + (CHAO_Y - baseY));
-    ctx.clip();
+  if (saindo) {
+    const anguloSaida = Math.max(-0.85, Math.min(0.45, inimigo.vy * 0.08));
+    ctx.rotate(anguloSaida);
   }
 
   const cabecaX = -14;
@@ -1462,6 +1949,8 @@ function desenharCena() {
     ctx.fillRect(0, CHAO_Y, configNivel.distanciaMeta + 200, 5);
   }
 
+  desenharCaminhosSubterraneos();
+  desenharBuracosChao();
   desenharEstruturasQuebradas();
   desenharPlataformas(configNivel);
 
@@ -1565,6 +2054,8 @@ function loopPrincipal() {
     atualizarSoldado();
     gerarInimigos();
     atualizarInimigos();
+    atualizarCaminhosSubterraneos();
+    atualizarBuracosChao();
     atualizarBoss();
     atualizarProjeteis();
     atualizarParticulasDano();
