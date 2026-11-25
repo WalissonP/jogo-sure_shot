@@ -12,6 +12,17 @@
     <main id="palco-wrapper" class="palco-wrapper">
       <canvas id="tela-jogo" width="900" height="440"></canvas>
 
+      <!-- Botão de pause no canto superior direito -->
+      <button
+        id="btn-pause-jogo"
+        type="button"
+        class="btn-secundario btn-pause oculto"
+        aria-label="Pausar jogo"
+        title="Pausar (Esc)"
+      >
+        ⏸ Pause
+      </button>
+
       <!-- 1. Tela inicial: Pressione qualquer tecla para começar -->
       <div id="overlay-press-key" class="overlay">
         <div class="cartao-press-key">
@@ -80,6 +91,52 @@
             <button id="btn-confirmar-sair" type="button" class="btn-primario">Tela Inicial</button>
             <button id="btn-cancelar-sair" type="button" class="btn-secundario">Voltar ao Menu</button>
           </div>
+        </div>
+      </div>
+
+      <!-- 3. Menu de pause durante a partida -->
+      <div id="overlay-pause" class="overlay oculto">
+        <div id="painel-pause-menu" class="painel-menu">
+          <p class="etiqueta-sistema">JOGO PAUSADO</p>
+          <h2>PAUSA</h2>
+
+          <div class="menu-botoes">
+            <button id="btn-pause-continuar" type="button" class="btn-primario btn-menu">Continuar</button>
+            <button id="btn-pause-controles" type="button" class="btn-secundario btn-menu">Controles</button>
+            <button id="btn-pause-opcoes" type="button" class="btn-secundario btn-menu">Opções</button>
+            <button id="btn-pause-lobby" type="button" class="btn-secundario btn-menu btn-sair">Voltar ao Lobby</button>
+          </div>
+        </div>
+
+        <!-- Subtela de Controles dentro do Pause -->
+        <div id="painel-pause-controles" class="painel-menu oculto">
+          <h3>Controles</h3>
+          <ul class="lista-controles">
+            <li><strong>Lobby</strong>: <strong>A/D</strong> ou <strong>←/→</strong> andar • <strong>Enter/Espaço</strong> entrar</li>
+            <li><strong>Andar</strong>: <strong>A / D</strong> ou <strong>← / →</strong></li>
+            <li><strong>Mirar para cima</strong>: <strong>W</strong> ou <strong>↑</strong> (segurar)</li>
+            <li><strong>Agachar</strong>: <strong>S</strong> ou <strong>↓</strong> (segurar)</li>
+            <li><strong>Pular</strong>: <strong>Espaço</strong></li>
+            <li><strong>Atirar</strong>: <strong>J</strong> ou <strong>Z</strong></li>
+            <li><strong>Música / Reiniciar / Pausar</strong>: <strong>M</strong> / <strong>R</strong> / <strong>Esc</strong></li>
+          </ul>
+          <button id="btn-voltar-pause-controles" type="button" class="btn-primario">Voltar ao Pause</button>
+        </div>
+
+        <!-- Subtela de Opções dentro do Pause -->
+        <div id="painel-pause-config" class="painel-menu oculto">
+          <h3>Opções</h3>
+          <div class="opcoes-lista">
+            <div class="opcao-linha">
+              <span>Música (apenas trilha)</span>
+              <button id="btn-pause-opcao-musica" type="button" class="btn-secundario">🎵 Música: ON</button>
+            </div>
+            <div class="opcao-linha">
+              <span>Modo Tela Cheia</span>
+              <button id="btn-pause-opcao-fullscreen" type="button" class="btn-secundario">⛶ Alternar Tela Cheia</button>
+            </div>
+          </div>
+          <button id="btn-voltar-pause-opcoes" type="button" class="btn-primario">Voltar ao Pause</button>
         </div>
       </div>
 

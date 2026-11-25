@@ -5,6 +5,22 @@ const appTelaCheia = document.querySelector("#app-tela-cheia");
 const canvas = document.querySelector("#tela-jogo");
 const ctx = canvas.getContext("2d");
 
+const btnPauseJogo = document.querySelector("#btn-pause-jogo");
+const overlayPause = document.querySelector("#overlay-pause");
+const painelPauseMenu = document.querySelector("#painel-pause-menu");
+const painelPauseControles = document.querySelector("#painel-pause-controles");
+const painelPauseConfig = document.querySelector("#painel-pause-config");
+
+const btnPauseContinuar = document.querySelector("#btn-pause-continuar");
+const btnPauseControles = document.querySelector("#btn-pause-controles");
+const btnPauseOpcoes = document.querySelector("#btn-pause-opcoes");
+const btnPauseLobby = document.querySelector("#btn-pause-lobby");
+
+const btnVoltarPauseControles = document.querySelector("#btn-voltar-pause-controles");
+const btnVoltarPauseOpcoes = document.querySelector("#btn-voltar-pause-opcoes");
+const btnPauseOpcaoMusica = document.querySelector("#btn-pause-opcao-musica");
+const btnPauseOpcaoFullscreen = document.querySelector("#btn-pause-opcao-fullscreen");
+
 const barraLobby = document.querySelector("#barra-lobby");
 const statusLobbyTexto = document.querySelector("#status-lobby-texto");
 const btnLobbyMusica = document.querySelector("#btn-lobby-musica");
@@ -181,8 +197,11 @@ const sistemaAudio = {
   musicaAtiva: true
 };
 
-// Liberado apenas a partir do lobby (lobby, jogando, vitoria_fase, derrota) e nas Opções
+// Liberado a partir do lobby (lobby, jogando, pausado, vitoria_fase, derrota) e nas Opções
 function podeControlarMusica() {
+  if (estadoJogo.status === "pausado") {
+    return true;
+  }
   if (estadoJogo.status === "menu" && !painelOpcoes.classList.contains("oculto")) {
     return true;
   }
@@ -193,14 +212,12 @@ function atualizarBotaoMusicaUI() {
   const liberado = podeControlarMusica();
   const rotulo = sistemaAudio.musicaAtiva ? "🎵 Música: ON" : "🔇 Música: OFF";
 
-  if (btnLobbyMusica) {
-    btnLobbyMusica.textContent = rotulo;
-    btnLobbyMusica.disabled = !liberado;
-  }
-  if (btnOpcaoMusica) {
-    btnOpcaoMusica.textContent = rotulo;
-    btnOpcaoMusica.disabled = !liberado;
-  }
+  [btnLobbyMusica, btnOpcaoMusica, btnPauseOpcaoMusica].forEach((btn) => {
+    if (btn) {
+      btn.textContent = rotulo;
+      btn.disabled = !liberado;
+    }
+  });
 }
 
 function alternarMusicaApenas() {
@@ -211,14 +228,13 @@ function alternarMusicaApenas() {
 
   if (!sistemaAudio.musicaAtiva) {
     pararMusicaFase();
-  } else {
+  } else if (estadoJogo.status === "lobby") {
     garantirAudioContexto();
-    if (estadoJogo.status === "lobby") {
-      iniciarMusica("lobby");
-    } else if (estadoJogo.status === "jogando") {
-      const configNivel = NIVEIS[estadoJogo.nivelIndice];
-      iniciarMusica(configNivel.numero);
-    }
+    iniciarMusica("lobby");
+  } else if (estadoJogo.status === "jogando") {
+    garantirAudioContexto();
+    const configNivel = NIVEIS[estadoJogo.nivelIndice];
+    iniciarMusica(configNivel.numero);
   }
 }
 
@@ -445,7 +461,7 @@ function iniciarMusica(chaveFaixa) {
 }
 
 // =========================================================
-// 3. ESTADO DO JOGO (FLUXO INICIAL, MENU, LOBBY E COMBATE)
+// 3. ESTADO DO JOGO (FLUXO INICIAL, MENU, LOBBY, PAUSE E COMBATE)
 // =========================================================
 const teclas = {};
 
@@ -483,7 +499,7 @@ function salvarProgresso() {
 const progressoInicial = carregarProgressoSalvo();
 
 const estadoJogo = {
-  // "press_key" | "menu" | "lobby" | "jogando" | "vitoria_fase" | "derrota"
+  // "press_key" | "menu" | "lobby" | "jogando" | "pausado" | "vitoria_fase" | "derrota"
   status: "press_key",
   maiorFaseDesbloqueada: progressoInicial.maiorFaseDesbloqueada,
   fasesConcluidas: progressoInicial.fasesConcluidas,
@@ -540,7 +556,7 @@ const soldado = {
 };
 
 // =========================================================
-// 3B. TELA CHEIA, TELA INICIAL E MENU CENTRAL
+// 3B. TELA CHEIA, TELA INICIAL, PAUSE E MENU CENTRAL
 // =========================================================
 function solicitarTelaCheiaSePossivel() {
   const alvo = appTelaCheia || document.documentElement;
@@ -560,10 +576,64 @@ function alternarTelaCheia() {
   }
 }
 
+function atualizarBotaoPauseUI() {
+  if (!btnPauseJogo) return;
+  if (estadoJogo.status === "jogando") {
+    btnPauseJogo.classList.remove("oculto");
+  } else {
+    btnPauseJogo.classList.add("oculto");
+  }
+}
+
 function esconderTodosOverlays() {
   overlayPressKey.classList.add("oculto");
   overlayMenuPrincipal.classList.add("oculto");
+  overlayPause.classList.add("oculto");
   overlayFim.classList.add("oculto");
+  atualizarBotaoPauseUI();
+}
+
+function pausarJogo(subtela = "principal") {
+  if (estadoJogo.status !== "jogando" && estadoJogo.status !== "pausado") return;
+
+  pararMusicaFase();
+  estadoJogo.status = "pausado";
+
+  Object.keys(teclas).forEach((codigoTecla) => {
+    teclas[codigoTecla] = false;
+  });
+
+  esconderTodosOverlays();
+  overlayPause.classList.remove("oculto");
+
+  painelPauseMenu.classList.add("oculto");
+  painelPauseControles.classList.add("oculto");
+  painelPauseConfig.classList.add("oculto");
+
+  if (subtela === "controles") {
+    painelPauseControles.classList.remove("oculto");
+  } else if (subtela === "opcoes") {
+    painelPauseConfig.classList.remove("oculto");
+  } else {
+    painelPauseMenu.classList.remove("oculto");
+  }
+
+  atualizarBarraLobbyUI();
+  atualizarBotaoMusicaUI();
+}
+
+function continuarJogo() {
+  if (estadoJogo.status !== "pausado") return;
+
+  estadoJogo.status = "jogando";
+  esconderTodosOverlays();
+  atualizarBarraLobbyUI();
+  atualizarBotaoMusicaUI();
+
+  if (sistemaAudio.musicaAtiva) {
+    const configNivel = NIVEIS[estadoJogo.nivelIndice];
+    iniciarMusica(configNivel.numero);
+  }
 }
 
 function irParaTelaPressKey() {
@@ -1076,6 +1146,37 @@ function finalizarDerrota() {
 // 5. EVENTOS (APENAS addEventListener)
 // =========================================================
 function registrarEventos() {
+  if (btnPauseJogo) {
+    btnPauseJogo.addEventListener("click", function () {
+      pausarJogo("principal");
+    });
+  }
+
+  btnPauseContinuar.addEventListener("click", continuarJogo);
+
+  btnPauseControles.addEventListener("click", function () {
+    pausarJogo("controles");
+  });
+
+  btnPauseOpcoes.addEventListener("click", function () {
+    pausarJogo("opcoes");
+  });
+
+  btnPauseLobby.addEventListener("click", function () {
+    abrirLobby(estadoJogo.nivelIndice);
+  });
+
+  btnVoltarPauseControles.addEventListener("click", function () {
+    pausarJogo("principal");
+  });
+
+  btnVoltarPauseOpcoes.addEventListener("click", function () {
+    pausarJogo("principal");
+  });
+
+  btnPauseOpcaoMusica.addEventListener("click", alternarMusicaApenas);
+  btnPauseOpcaoFullscreen.addEventListener("click", alternarTelaCheia);
+
   overlayPressKey.addEventListener("click", function () {
     irDiretoParaMenuAposTecla();
   });
@@ -1170,15 +1271,25 @@ function registrarEventos() {
 
     if (codigo === "Escape" && !evento.repeat) {
       evento.preventDefault();
-      if (estadoJogo.status === "menu") {
+      if (estadoJogo.status === "jogando") {
+        pausarJogo("principal");
+      } else if (estadoJogo.status === "pausado") {
+        // Não volta ao jogo com Esc: mantém o menu de pause aberto
+        pausarJogo("principal");
+      } else if (estadoJogo.status === "menu") {
         if (!painelMenuOpcoes.classList.contains("oculto")) {
           abrirLobby(estadoJogo.maiorFaseDesbloqueada);
         } else {
           abrirMenuPrincipal("principal");
         }
-      } else if (estadoJogo.status === "lobby" || estadoJogo.status === "jogando") {
+      } else if (estadoJogo.status === "lobby") {
         abrirMenuPrincipal("principal");
       }
+      return;
+    }
+
+    if (estadoJogo.status === "pausado") {
+      evento.preventDefault();
       return;
     }
 

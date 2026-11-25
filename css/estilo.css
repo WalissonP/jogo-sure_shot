@@ -42,6 +42,20 @@ body {
   background-color: #0b0f14;
 }
 
+.btn-pause {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 15;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+.btn-pause.oculto {
+  display: none;
+}
+
 .barra-lobby {
   display: flex;
   justify-content: space-between;
