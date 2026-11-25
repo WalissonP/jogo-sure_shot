@@ -74,6 +74,192 @@ const NIVEIS = [
 ];
 
 // =========================================================
+// 2B. TRILHA SONORA PROCEDURAL POR FASE (WEB AUDIO API)
+// =========================================================
+// Frequências em Hz (0 = pausa). Cada fase tem seu próprio tempo, onda e padrão.
+const MUSICAS_POR_FASE = {
+  1: {
+    bpm: 108,
+    ondaMelodia: "triangle",
+    ondaBaixo: "sawtooth",
+    volume: 0.055,
+    melodia: [
+      293.66, 0, 349.23, 329.63, 293.66, 0, 261.63, 220.0,
+      293.66, 0, 392.0, 349.23, 329.63, 261.63, 220.0, 0
+    ],
+    baixo: [
+      73.42, 73.42, 73.42, 73.42, 65.41, 65.41, 55.0, 55.0,
+      73.42, 73.42, 87.31, 87.31, 65.41, 65.41, 55.0, 55.0
+    ]
+  },
+  2: {
+    bpm: 124,
+    ondaMelodia: "square",
+    ondaBaixo: "triangle",
+    volume: 0.04,
+    melodia: [
+      329.63, 329.63, 392.0, 440.0, 392.0, 329.63, 293.66, 329.63,
+      392.0, 493.88, 440.0, 392.0, 329.63, 0, 246.94, 293.66
+    ],
+    baixo: [
+      82.41, 0, 82.41, 0, 98.0, 0, 110.0, 0,
+      82.41, 0, 123.47, 0, 73.42, 0, 61.74, 73.42
+    ]
+  },
+  3: {
+    bpm: 134,
+    ondaMelodia: "sawtooth",
+    ondaBaixo: "square",
+    volume: 0.036,
+    melodia: [
+      440.0, 523.25, 659.25, 523.25, 587.33, 698.46, 587.33, 440.0,
+      493.88, 587.33, 783.99, 587.33, 659.25, 523.25, 440.0, 392.0
+    ],
+    baixo: [
+      110.0, 110.0, 130.81, 130.81, 146.83, 146.83, 110.0, 110.0,
+      123.47, 123.47, 146.83, 146.83, 130.81, 130.81, 98.0, 98.0
+    ]
+  },
+  4: {
+    bpm: 142,
+    ondaMelodia: "square",
+    ondaBaixo: "sawtooth",
+    volume: 0.042,
+    melodia: [
+      369.99, 0, 440.0, 554.37, 493.88, 440.0, 369.99, 329.63,
+      369.99, 440.0, 587.33, 554.37, 493.88, 369.99, 329.63, 277.18
+    ],
+    baixo: [
+      92.5, 92.5, 92.5, 110.0, 92.5, 92.5, 82.41, 73.42,
+      92.5, 92.5, 123.47, 110.0, 92.5, 82.41, 73.42, 69.3
+    ]
+  },
+  5: {
+    bpm: 152,
+    ondaMelodia: "sawtooth",
+    ondaBaixo: "square",
+    volume: 0.048,
+    melodia: [
+      523.25, 523.25, 622.25, 523.25, 783.99, 739.99, 622.25, 587.33,
+      523.25, 622.25, 783.99, 1046.5, 932.33, 783.99, 622.25, 587.33
+    ],
+    baixo: [
+      65.41, 65.41, 77.78, 65.41, 98.0, 98.0, 87.31, 77.78,
+      65.41, 77.78, 98.0, 130.81, 116.54, 98.0, 77.78, 73.42
+    ]
+  }
+};
+
+const sistemaAudio = {
+  ctx: null,
+  timerId: null,
+  passoAtual: 0,
+  faseAtiva: null,
+  ativo: true
+};
+
+function garantirAudioContexto() {
+  if (!sistemaAudio.ativo) return null;
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return null;
+
+  if (!sistemaAudio.ctx) {
+    sistemaAudio.ctx = new AudioCtx();
+  }
+  if (sistemaAudio.ctx.state === "suspended") {
+    sistemaAudio.ctx.resume().catch(() => {});
+  }
+  return sistemaAudio.ctx;
+}
+
+function tocarNotaSintetizada(freq, duracaoSeg, tipoOnda, ganhoMax, offsetFiltro = 1400) {
+  if (!freq || freq <= 0 || !sistemaAudio.ctx) return;
+
+  const agora = sistemaAudio.ctx.currentTime;
+  const osc = sistemaAudio.ctx.createOscillator();
+  const filtro = sistemaAudio.ctx.createBiquadFilter();
+  const ganho = sistemaAudio.ctx.createGain();
+
+  osc.type = tipoOnda;
+  osc.frequency.setValueAtTime(freq, agora);
+
+  filtro.type = "lowpass";
+  filtro.frequency.setValueAtTime(offsetFiltro, agora);
+
+  ganho.gain.setValueAtTime(0.0001, agora);
+  ganho.gain.exponentialRampToValueAtTime(ganhoMax, agora + 0.015);
+  ganho.gain.exponentialRampToValueAtTime(0.0001, agora + Math.max(0.04, duracaoSeg * 0.92));
+
+  osc.connect(filtro);
+  filtro.connect(ganho);
+  ganho.connect(sistemaAudio.ctx.destination);
+
+  osc.start(agora);
+  osc.stop(agora + duracaoSeg);
+}
+
+function pararMusicaFase() {
+  if (sistemaAudio.timerId !== null) {
+    clearInterval(sistemaAudio.timerId);
+    sistemaAudio.timerId = null;
+  }
+  sistemaAudio.faseAtiva = null;
+  sistemaAudio.passoAtual = 0;
+}
+
+function iniciarMusicaFase(numeroFase) {
+  const faixa = MUSICAS_POR_FASE[numeroFase];
+  if (!faixa) {
+    pararMusicaFase();
+    return;
+  }
+
+  const audioCtx = garantirAudioContexto();
+  if (!audioCtx) return;
+
+  if (sistemaAudio.faseAtiva === numeroFase && sistemaAudio.timerId !== null) {
+    return;
+  }
+
+  pararMusicaFase();
+  sistemaAudio.faseAtiva = numeroFase;
+  sistemaAudio.passoAtual = 0;
+
+  // Cada passo equivale a uma semicolcheia (1/4 de batida)
+  const duracaoPassoSeg = 60 / faixa.bpm / 4;
+  const intervaloMs = duracaoPassoSeg * 1000;
+
+  const executarPasso = () => {
+    if (estadoJogo.status !== "jogando" || !sistemaAudio.ativo) return;
+    if (!sistemaAudio.ctx || sistemaAudio.ctx.state !== "running") return;
+
+    const idx = sistemaAudio.passoAtual % faixa.melodia.length;
+    const notaMelodia = faixa.melodia[idx];
+    const notaBaixo = faixa.baixo[idx];
+
+    tocarNotaSintetizada(
+      notaMelodia,
+      duracaoPassoSeg,
+      faixa.ondaMelodia,
+      faixa.volume,
+      2200
+    );
+    tocarNotaSintetizada(
+      notaBaixo,
+      duracaoPassoSeg * 1.1,
+      faixa.ondaBaixo,
+      faixa.volume * 0.85,
+      520
+    );
+
+    sistemaAudio.passoAtual++;
+  };
+
+  executarPasso();
+  sistemaAudio.timerId = setInterval(executarPasso, intervaloMs);
+}
+
+// =========================================================
 // 3. ESTADO DO JOGO (OBJETOS E ARRAYS)
 // =========================================================
 const teclas = {};
@@ -129,6 +315,8 @@ const soldado = {
 // 4. INICIALIZAÇÃO, NÍVEIS E REINÍCIO
 // =========================================================
 function iniciarPartida() {
+  garantirAudioContexto();
+
   estadoJogo.status = "jogando";
   estadoJogo.nivelIndice = 0;
   estadoJogo.pontuacao = 0;
@@ -218,6 +406,10 @@ function carregarNivel(indice) {
       { x: 600, y: CHAO_Y - 105, largura: 160, altura: 16, tipo: "padrao", desmoronavel: false }
     );
     criarBoss();
+  }
+
+  if (estadoJogo.status === "jogando") {
+    iniciarMusicaFase(configNivel.numero);
   }
 }
 
@@ -323,6 +515,7 @@ function criarBoss() {
 }
 
 function finalizarPartida(venceu) {
+  pararMusicaFase();
   estadoJogo.status = venceu ? "vitoria" : "derrota";
   tituloFim.textContent = venceu ? "Missão Cumprida!" : "Soldado Abatido!";
   mensagemFim.textContent = venceu
@@ -342,6 +535,10 @@ function registrarEventos() {
   window.addEventListener("keydown", function (evento) {
     const codigo = evento.code;
     teclas[codigo] = true;
+
+    if (estadoJogo.status === "jogando") {
+      garantirAudioContexto();
+    }
 
     if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(codigo)) {
       evento.preventDefault();
@@ -1413,7 +1610,6 @@ function desenharEntradaCaverna(xBase, configNivel) {
 
   ctx.save();
 
-  // 1. Maciço rochoso traseiro / sombra da montanha
   ctx.fillStyle = "#24201c";
   ctx.beginPath();
   ctx.moveTo(baseX - 18, chao + 2);
@@ -1426,7 +1622,6 @@ function desenharEntradaCaverna(xBase, configNivel) {
   ctx.closePath();
   ctx.fill();
 
-  // 2. Camadas rochosas principais com facetas realistas
   ctx.fillStyle = "#3b352f";
   ctx.beginPath();
   ctx.moveTo(baseX - 12, chao + 2);
@@ -1439,7 +1634,6 @@ function desenharEntradaCaverna(xBase, configNivel) {
   ctx.closePath();
   ctx.fill();
 
-  // Destaque de luz superior nas rochas
   ctx.fillStyle = "#574f46";
   ctx.beginPath();
   ctx.moveTo(baseX + 18, chao - 92);
@@ -1450,7 +1644,6 @@ function desenharEntradaCaverna(xBase, configNivel) {
   ctx.closePath();
   ctx.fill();
 
-  // Pedras soltas e saliências ao redor da boca da caverna
   const blocosPedra = [
     { x: baseX - 16, y: chao - 24, w: 22, h: 24, cor: "#4a433b", sombra: "#2b2621" },
     { x: baseX - 6, y: chao - 54, w: 24, h: 20, cor: "#5c5349", sombra: "#332d27" },
@@ -1475,11 +1668,9 @@ function desenharEntradaCaverna(xBase, configNivel) {
     ctx.fillRect(b.x + 2, b.y + b.h - 5, b.w - 4, 5);
   }
 
-  // 3. Boca escura da caverna com profundidade em gradiente
   const bocaX = baseX + 14;
   const bocaY = chao - 64;
   const bocaLargura = 46;
-  const bocaAltura = 64;
 
   const gradCaverna = ctx.createLinearGradient(bocaX, bocaY, bocaX + bocaLargura, chao);
   gradCaverna.addColorStop(0, "#050506");
@@ -1500,7 +1691,6 @@ function desenharEntradaCaverna(xBase, configNivel) {
   ctx.closePath();
   ctx.fill();
 
-  // Sombra interna no teto e laterais da abertura
   ctx.strokeStyle = "#1a1614";
   ctx.lineWidth = 3;
   ctx.beginPath();
@@ -1515,7 +1705,6 @@ function desenharEntradaCaverna(xBase, configNivel) {
   ctx.lineTo(bocaX + bocaLargura - 3, chao);
   ctx.stroke();
 
-  // Frestas / rachaduras na rocha
   ctx.strokeStyle = "#1d1916";
   ctx.lineWidth = 1.8;
   ctx.beginPath();
@@ -1526,11 +1715,9 @@ function desenharEntradaCaverna(xBase, configNivel) {
   ctx.lineTo(baseX + 62, chao - 68);
   ctx.stroke();
 
-  // 4. Tocha na frente, ao lado esquerdo da entrada
   const tochaX = baseX - 24;
   const tochaY = chao - 36;
 
-  // Halo de luz quente ao redor da tocha e iluminando a entrada da caverna
   const raioLuz = 42 + oscilacaoBrilho;
   const gradLuz = ctx.createRadialGradient(
     tochaX,
@@ -1549,7 +1736,6 @@ function desenharEntradaCaverna(xBase, configNivel) {
   ctx.arc(tochaX + 10, tochaY, raioLuz, 0, Math.PI * 2);
   ctx.fill();
 
-  // Base de pedra e suporte da tocha fincado no chão
   ctx.fillStyle = "#4d453d";
   ctx.beginPath();
   ctx.moveTo(tochaX - 9, chao + 1);
@@ -1559,7 +1745,6 @@ function desenharEntradaCaverna(xBase, configNivel) {
   ctx.closePath();
   ctx.fill();
 
-  // Haste de madeira / ferro inclinada levemente para a caverna
   ctx.strokeStyle = "#2b1d12";
   ctx.lineWidth = 4.5;
   ctx.lineCap = "round";
@@ -1568,11 +1753,9 @@ function desenharEntradaCaverna(xBase, configNivel) {
   ctx.lineTo(tochaX - 2, tochaY + 2);
   ctx.stroke();
 
-  // Braçadeira metálica da tocha
   ctx.fillStyle = "#5c636a";
   ctx.fillRect(tochaX - 5.5, tochaY - 1, 7, 5);
 
-  // Chama animada da tocha
   const pontaChamaX = tochaX - 2 + oscilacaoChama * 2.2;
   const pontaChamaY = tochaY - 14 - Math.abs(oscilacaoChama) * 2.5;
 
