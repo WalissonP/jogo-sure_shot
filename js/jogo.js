@@ -79,8 +79,8 @@ const NIVEIS = [
     nome: "Setor 2 - Caverna Profunda",
     corCeu: "#12161f",
     corChao: "#262229",
-    distanciaMeta: 2900,
-    intervaloSpawn: 195,
+    distanciaMeta: 3100,
+    intervaloSpawn: 220,
     tiposInimigos: ["voador_acido"]
   },
   {
@@ -89,7 +89,7 @@ const NIVEIS = [
     corCeu: "#2b1215",
     corChao: "#3b1d22",
     distanciaMeta: 900,
-    intervaloSpawn: 140,
+    intervaloSpawn: 160,
     tiposInimigos: ["voador_acido", "rastejador"]
   }
 ];
@@ -109,7 +109,7 @@ const NOS_LOBBY = [
     indice: 1,
     rotuloCurto: "FASE 2",
     titulo: "Caverna Profunda",
-    subtitulo: "Rastejadores e cuspidores de ácido",
+    subtitulo: "Abismos, rastejadores e voadores de ácido",
     x: 455,
     y: 195,
     raio: 28,
@@ -522,6 +522,7 @@ const estadoJogo = {
   plataformas: [],
   estruturasQuebradas: [],
   obstaculos: [],
+  abismosSemFundo: [],
   buracosChao: [],
   caminhosSubterraneos: [],
   itensChao: [],
@@ -547,8 +548,12 @@ const soldado = {
   velocidade: 4.5,
   forcaPulo: -13.5,
   noChao: false,
+  caindoNoAbismo: false,
   deitado: false,
   olhandoCima: false,
+  mirandoParado: false,
+  miraDx: 1,
+  miraDy: 0,
   direcao: 1,
   vida: 100,
   vidaMaxima: 100
@@ -724,6 +729,10 @@ function posicionarSoldadoNoNoLobby(indiceNo) {
   const no = NOS_LOBBY[indiceNo] || NOS_LOBBY[0];
   soldado.deitado = false;
   soldado.olhandoCima = false;
+  soldado.mirandoParado = false;
+  soldado.miraDx = 1;
+  soldado.miraDy = 0;
+  soldado.caindoNoAbismo = false;
   soldado.largura = soldado.larguraEmPe;
   soldado.alturaAtual = soldado.alturaEmPe;
   soldado.x = no.x - soldado.largura / 2;
@@ -857,12 +866,17 @@ function iniciarFase(indice) {
   estadoJogo.particulasDano = [];
   estadoJogo.efeitosImpacto = [];
   estadoJogo.particulasVitoria = [];
+  estadoJogo.abismosSemFundo = [];
   estadoJogo.buracosChao = [];
   estadoJogo.caminhosSubterraneos = [];
 
   soldado.vida = soldado.vidaMaxima;
   soldado.direcao = 1;
   soldado.deitado = false;
+  soldado.mirandoParado = false;
+  soldado.miraDx = 1;
+  soldado.miraDy = 0;
+  soldado.caindoNoAbismo = false;
   soldado.largura = soldado.larguraEmPe;
   soldado.alturaAtual = soldado.alturaEmPe;
 
@@ -879,6 +893,7 @@ function carregarNivel(indice) {
   estadoJogo.inimigos = [];
   estadoJogo.obstaculos = [];
   estadoJogo.estruturasQuebradas = [];
+  estadoJogo.abismosSemFundo = [];
   estadoJogo.buracosChao = [];
   estadoJogo.caminhosSubterraneos = [];
   estadoJogo.itensChao = [];
@@ -893,6 +908,10 @@ function carregarNivel(indice) {
   estadoJogo.avisoNivelFrames = 140;
 
   soldado.deitado = false;
+  soldado.mirandoParado = false;
+  soldado.miraDx = 1;
+  soldado.miraDy = 0;
+  soldado.caindoNoAbismo = false;
   soldado.largura = soldado.larguraEmPe;
   soldado.alturaAtual = soldado.alturaEmPe;
   soldado.x = 100;
@@ -908,6 +927,7 @@ function carregarNivel(indice) {
   } else if (configNivel.numero === 2) {
     configurarMapaFase2Caverna(configNivel.distanciaMeta);
     posicionarRastejadoresFase2();
+    posicionarVoadoresFase2();
   } else {
     estadoJogo.plataformas.push(
       { x: 140, y: CHAO_Y - 105, largura: 160, altura: 16, tipo: "padrao", desmoronavel: false },
@@ -966,14 +986,31 @@ function configurarMapaFase1(distanciaMeta) {
 }
 
 function configurarMapaFase2Caverna(distanciaMeta) {
-  // Blocos e formações rochosas no chão que servem para o soldado subir e fugir dos inimigos
+  // Buracos sem fundo no chão: ao cair neles, o soldado morre
+  const abismos = [
+    { x: 500, largura: 82 },
+    { x: 1020, largura: 90 },
+    { x: 1560, largura: 86 },
+    { x: 2100, largura: 94 },
+    { x: 2640, largura: 88 }
+  ];
+
+  for (let i = 0; i < abismos.length; i++) {
+    const ab = abismos[i];
+    estadoJogo.abismosSemFundo.push({
+      x: ab.x,
+      largura: ab.largura
+    });
+  }
+
+  // Blocos e formações rochosas no chão para o soldado subir e fugir dos inimigos
   const formacoesChao = [
-    { x: 360, largura: 84, altura: 46, tipo: "rocha_elevada" },
+    { x: 340, largura: 84, altura: 46, tipo: "rocha_elevada" },
     { x: 760, largura: 110, altura: 66, tipo: "rocha_elevada" },
-    { x: 1190, largura: 76, altura: 42, tipo: "rocha_elevada" },
-    { x: 1580, largura: 118, altura: 72, tipo: "rocha_elevada" },
-    { x: 2040, largura: 92, altura: 54, tipo: "rocha_elevada" },
-    { x: 2450, largura: 104, altura: 64, tipo: "rocha_elevada" }
+    { x: 1240, largura: 82, altura: 46, tipo: "rocha_elevada" },
+    { x: 1760, largura: 114, altura: 70, tipo: "rocha_elevada" },
+    { x: 2290, largura: 92, altura: 54, tipo: "rocha_elevada" },
+    { x: 2810, largura: 96, altura: 58, tipo: "rocha_elevada" }
   ];
 
   for (let i = 0; i < formacoesChao.length; i++) {
@@ -988,7 +1025,7 @@ function configurarMapaFase2Caverna(distanciaMeta) {
   }
 
   // Saliências/plataformas de pedra da caverna para escalada e fuga rápida
-  for (let px = 520; px < distanciaMeta - 320; px += 520) {
+  for (let px = 620; px < distanciaMeta - 340; px += 560) {
     estadoJogo.plataformas.push({
       x: px,
       y: CHAO_Y - 108,
@@ -1017,16 +1054,36 @@ function posicionarRastejadoresMapa() {
 
 function posicionarRastejadoresFase2() {
   const pontosFase2 = [
-    { x: 640, alcance: 250, velocidadeAtaque: 1.55 },
-    { x: 1060, alcance: 260, velocidadeAtaque: 1.65 },
-    { x: 1480, alcance: 265, velocidadeAtaque: 1.75 },
-    { x: 1920, alcance: 270, velocidadeAtaque: 1.85 },
-    { x: 2360, alcance: 275, velocidadeAtaque: 1.9 }
+    { x: 430, alcance: 240, velocidadeAtaque: 1.5 },
+    { x: 670, alcance: 250, velocidadeAtaque: 1.6 },
+    { x: 920, alcance: 255, velocidadeAtaque: 1.65 },
+    { x: 1180, alcance: 260, velocidadeAtaque: 1.7 },
+    { x: 1450, alcance: 265, velocidadeAtaque: 1.75 },
+    { x: 1700, alcance: 260, velocidadeAtaque: 1.8 },
+    { x: 1980, alcance: 270, velocidadeAtaque: 1.85 },
+    { x: 2240, alcance: 265, velocidadeAtaque: 1.85 },
+    { x: 2520, alcance: 275, velocidadeAtaque: 1.9 },
+    { x: 2770, alcance: 270, velocidadeAtaque: 1.9 }
   ];
 
   for (let i = 0; i < pontosFase2.length; i++) {
     const p = pontosFase2[i];
     estadoJogo.inimigos.push(criarRastejador(p.x, p.alcance, p.velocidadeAtaque, i + 10));
+  }
+}
+
+function posicionarVoadoresFase2() {
+  // Voadores posicionados em pontos do mapa; só decolam e patrulham quando o soldado se aproxima
+  const locaisVoadores = [
+    { x: 650, y: 155, raioDeteccao: 290, amplitudePatrulha: 130 },
+    { x: 1360, y: 145, raioDeteccao: 300, amplitudePatrulha: 145 },
+    { x: 2020, y: 160, raioDeteccao: 300, amplitudePatrulha: 140 },
+    { x: 2580, y: 148, raioDeteccao: 310, amplitudePatrulha: 145 }
+  ];
+
+  for (let i = 0; i < locaisVoadores.length; i++) {
+    const lv = locaisVoadores[i];
+    estadoJogo.inimigos.push(criarVoadorAcido(lv.x, lv.y, lv.raioDeteccao, lv.amplitudePatrulha, i * 1.4));
   }
 }
 
@@ -1058,28 +1115,31 @@ function criarRastejador(x, alcance = 250, velocidadeAtaque = 1.5, indice = 0) {
   };
 }
 
-function criarVoadorAcido(spawnX, direcaoVoo = -1, faseSeed = 0) {
-  const dir = direcaoVoo >= 0 ? 1 : -1;
-  const alturaBase = 135 + Math.random() * 95;
+function criarVoadorAcido(x, yBase, raioDeteccao = 290, amplitudePatrulha = 135, faseSeed = 0) {
   return {
     tipo: "voador_acido",
-    x: spawnX,
-    y: alturaBase,
-    yBase: alturaBase,
-    largura: 46,
+    x: x,
+    y: yBase,
+    yBase: yBase,
+    xAncora: x,
+    raioDeteccao: raioDeteccao,
+    amplitudePatrulha: amplitudePatrulha,
+    ativoPatrulha: false,
+    largura: 48,
     altura: 28,
-    vx: dir * (2.3 + Math.random() * 0.7),
+    vx: 0,
     vy: 0,
-    direcaoVoo: dir,
+    direcaoVoo: -1,
     faseAsa: faseSeed,
     vida: 1,
     vidaMaxima: 1,
     mostrarBarraVida: false,
     pontos: 100,
     danoFrames: 0,
-    cor: "#7a5c9e",
-    ultimoAcidoFrame: estadoJogo.frameAtual - 55,
-    cadenciaAcido: 82 + Math.floor(Math.random() * 25)
+    cor: "#6d4c7d",
+    // Dispara a cada 5 segundos (300 frames a 60 FPS) após começar a voar
+    ultimoAcidoFrame: -300,
+    cadenciaAcido: FPS_ESTIMADO * 5
   };
 }
 
@@ -1189,12 +1249,14 @@ function atualizarAcaoVitoriaFase() {
   }
 }
 
-function finalizarDerrota() {
+function finalizarDerrota(motivoQueda = false) {
   pararMusicaFase();
   tocarSfxDerrota();
   estadoJogo.status = "derrota";
-  tituloFim.textContent = "Soldado Abatido!";
-  mensagemFim.textContent = "Sua energia chegou a zero. Tente novamente ou volte ao lobby.";
+  tituloFim.textContent = motivoQueda ? "Você Caiu no Abismo!" : "Soldado Abatido!";
+  mensagemFim.textContent = motivoQueda
+    ? "Você caiu em um buraco sem fundo. Tente novamente ou volte ao lobby."
+    : "Sua energia chegou a zero. Tente novamente ou volte ao lobby.";
   pontuacaoFinalEl.textContent = estadoJogo.pontuacao;
   atualizarBarraLobbyUI();
   atualizarBotaoMusicaUI();
@@ -1393,8 +1455,18 @@ function registrarEventos() {
 }
 
 // =========================================================
-// 6. LÓGICA DO SOLDADO, PLATAFORMAS, ESTRUTURAS E DISPAROS
+// 6. LÓGICA DO SOLDADO, PLATAFORMAS, ABISMOS E DISPAROS
 // =========================================================
+function encontrarAbismoSobrePe(peX) {
+  for (let i = 0; i < estadoJogo.abismosSemFundo.length; i++) {
+    const ab = estadoJogo.abismosSemFundo[i];
+    if (peX > ab.x + 8 && peX < ab.x + ab.largura - 8) {
+      return ab;
+    }
+  }
+  return null;
+}
+
 function atualizarPlataformas() {
   for (let i = estadoJogo.plataformas.length - 1; i >= 0; i--) {
     const plat = estadoJogo.plataformas[i];
@@ -1456,15 +1528,54 @@ function resolverColisaoHorizontal(caixaAtual, xAnterior, bloco) {
   return false;
 }
 
-function atualizarSoldado() {
+function atualizarMiraESoldado() {
+  if (soldado.caindoNoAbismo) {
+    soldado.vy += GRAVIDADE * 1.1;
+    soldado.y += soldado.vy;
+    soldado.x += soldado.vx * 0.4;
+    if (soldado.y > canvas.height + 24) {
+      soldado.vida = 0;
+      finalizarDerrota(true);
+    }
+    return;
+  }
+
   const esquerda = teclas["KeyA"] || teclas["ArrowLeft"];
   const direita = teclas["KeyD"] || teclas["ArrowRight"];
   const cima = teclas["KeyW"] || teclas["ArrowUp"];
   const baixo = teclas["KeyS"] || teclas["ArrowDown"];
+  const segurandoTravaMira = Boolean(teclas["KeyK"] || teclas["KeyX"]);
   const pular = teclas["Space"];
   const atirar = teclas["KeyJ"] || teclas["KeyZ"];
 
-  const querDeitar = Boolean(baixo && soldado.noChao);
+  soldado.mirandoParado = segurandoTravaMira;
+
+  let dirX = 0;
+  let dirY = 0;
+  if (esquerda && !direita) dirX = -1;
+  else if (direita && !esquerda) dirX = 1;
+  if (cima && !baixo) dirY = -1;
+  else if (baixo && !cima) dirY = 1;
+
+  if (segurandoTravaMira) {
+    if (dirX !== 0 || dirY !== 0) {
+      soldado.miraDx = dirX;
+      soldado.miraDy = dirY;
+      if (dirX !== 0) {
+        soldado.direcao = dirX;
+      }
+    } else {
+      soldado.miraDx = soldado.direcao;
+      soldado.miraDy = 0;
+    }
+    soldado.olhandoCima = soldado.miraDy < 0 && soldado.miraDx === 0;
+  } else {
+    soldado.miraDx = soldado.direcao;
+    soldado.miraDy = 0;
+    soldado.olhandoCima = Boolean(cima && !soldado.deitado);
+  }
+
+  const querDeitar = Boolean(!segurandoTravaMira && baixo && soldado.noChao);
 
   let bloqueadoParaLevantar = false;
   if (!querDeitar && soldado.deitado) {
@@ -1503,13 +1614,13 @@ function atualizarSoldado() {
     soldado.x = centroXAntigo - soldado.largura / 2;
   }
 
-  soldado.olhandoCima = Boolean(cima && !soldado.deitado);
-
   const emRecuoDano = estadoJogo.danoSoldadoFrames > 8;
   const fatorVelocidade = soldado.deitado ? 0.55 : 1;
 
   if (!emRecuoDano) {
-    if (esquerda && !direita) {
+    if (segurandoTravaMira) {
+      soldado.vx = 0;
+    } else if (esquerda && !direita) {
       soldado.vx = -soldado.velocidade * fatorVelocidade;
       soldado.direcao = -1;
     } else if (direita && !esquerda) {
@@ -1617,10 +1728,17 @@ function atualizarSoldado() {
     }
   }
 
-  if (soldado.y + soldado.alturaAtual >= CHAO_Y) {
+  const peX = soldado.x + soldado.largura / 2;
+  const abismoSobrePe = encontrarAbismoSobrePe(peX);
+
+  if (!abismoSobrePe && soldado.y + soldado.alturaAtual >= CHAO_Y) {
     soldado.y = CHAO_Y - soldado.alturaAtual;
     soldado.vy = 0;
     soldado.noChao = true;
+  } else if (abismoSobrePe && soldado.y + soldado.alturaAtual >= CHAO_Y + 6) {
+    soldado.caindoNoAbismo = true;
+    tocarSfxDano();
+    return;
   }
 
   if (configNivel.numero < NIVEIS.length) {
@@ -1644,6 +1762,30 @@ function atualizarSoldado() {
 function dispararTiroSoldado() {
   const velocidadeTiro = 10;
   tocarSfxTiro();
+
+  if (soldado.mirandoParado) {
+    const dx = soldado.miraDx;
+    const dy = soldado.miraDy;
+    const mag = Math.hypot(dx, dy) || 1;
+    const vx = (dx / mag) * velocidadeTiro;
+    const vy = (dy / mag) * velocidadeTiro;
+
+    const origemX = soldado.x + soldado.largura / 2 + dx * 16;
+    const origemY = soldado.y + soldado.alturaAtual * 0.45 + dy * 16;
+    const nivelTiro = dy > 0 && dx === 0 ? "baixo" : dy < 0 && dx === 0 ? "alto" : "medio";
+
+    estadoJogo.tirosJogador.push({
+      x: origemX - 5,
+      y: origemY - 5,
+      largura: Math.abs(vx) >= Math.abs(vy) ? 14 : 8,
+      altura: Math.abs(vy) > Math.abs(vx) ? 14 : 8,
+      vx: vx,
+      vy: vy,
+      dano: 1,
+      nivelTiro: nivelTiro
+    });
+    return;
+  }
 
   if (soldado.olhandoCima) {
     estadoJogo.tirosJogador.push({
@@ -1691,7 +1833,7 @@ function dispararTiroSoldado() {
 function gerarInimigos() {
   const configNivel = NIVEIS[estadoJogo.nivelIndice];
 
-  if (configNivel.numero === 1) return;
+  if (configNivel.numero === 1 || configNivel.numero === 2) return;
 
   if (estadoJogo.frameAtual % configNivel.intervaloSpawn !== 0) return;
 
@@ -1699,33 +1841,8 @@ function gerarInimigos() {
     return;
   }
 
-  // Na Fase 2, os bichos voadores passam de tempos em tempos vindos de frente ou de trás
-  if (configNivel.numero === 2) {
-    const voadoresAtivos = estadoJogo.inimigos.filter((e) => e.tipo === "voador_acido").length;
-    if (voadoresAtivos < 3) {
-      const vemDaFrente = Math.random() < 0.72;
-      const dirVoo = vemDaFrente ? -1 : 1;
-      const spawnX = vemDaFrente
-        ? Math.min(estadoJogo.cameraX + canvas.width + 25, configNivel.distanciaMeta - 40)
-        : Math.max(estadoJogo.cameraX - 45, 20);
-
-      estadoJogo.inimigos.push(criarVoadorAcido(spawnX, dirVoo, estadoJogo.frameAtual * 0.3));
-    }
-    return;
-  }
-
-  const tipos = configNivel.tiposInimigos;
-  const tipoEscolhido = tipos[Math.floor(Math.random() * tipos.length)];
-  const spawnX =
-    configNivel.numero === 3
-      ? canvas.width - 40
-      : Math.min(estadoJogo.cameraX + canvas.width + 30, configNivel.distanciaMeta - 80);
-
-  if (tipoEscolhido === "voador_acido") {
-    estadoJogo.inimigos.push(criarVoadorAcido(spawnX, -1, estadoJogo.frameAtual * 0.3));
-  } else if (tipoEscolhido === "rastejador") {
-    estadoJogo.inimigos.push(criarRastejador(spawnX, 250, 1.55, estadoJogo.frameAtual));
-  }
+  const spawnX = canvas.width - 40;
+  estadoJogo.inimigos.push(criarRastejador(spawnX, 250, 1.55, estadoJogo.frameAtual));
 }
 
 function encontrarObstaculoAFrente(inimigo, dir) {
@@ -1743,6 +1860,17 @@ function encontrarObstaculoAFrente(inimigo, dir) {
     }
   }
   return null;
+}
+
+function rastejadorAtingiriaAbismo(proximoX, largura, dir) {
+  const bordaFrente = dir === 1 ? proximoX + largura + 4 : proximoX - 4;
+  for (let i = 0; i < estadoJogo.abismosSemFundo.length; i++) {
+    const ab = estadoJogo.abismosSemFundo[i];
+    if (bordaFrente > ab.x && bordaFrente < ab.x + ab.largura) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function criarBuracoNoSolo(xPos, larguraCorpo, fechandoDesdeInicio = false, duracaoFrames = 140) {
@@ -1901,7 +2029,7 @@ function iniciarEscavacaoEntrada(inimigo) {
 
 function cuspirAcidoEmDirecaoAoSoldado(voador) {
   const origemX = voador.x + voador.largura / 2;
-  const origemY = voador.y + voador.altura - 4;
+  const origemY = voador.y + voador.altura - 2;
   const alvoX = soldado.x + soldado.largura / 2;
   const alvoY = soldado.y + soldado.alturaAtual * 0.45;
 
@@ -1957,8 +2085,14 @@ function atualizarInimigos() {
           inimigo.y += inimigo.vy;
           registrarPontoArcoPulo(inimigo);
         } else {
-          inimigo.vx = inimigo.direcaoOlhar * inimigo.velocidadeAtaque;
-          inimigo.x += inimigo.vx;
+          const passoX = inimigo.direcaoOlhar * inimigo.velocidadeAtaque;
+          const proximoX = inimigo.x + passoX;
+          if (!rastejadorAtingiriaAbismo(proximoX, inimigo.largura, inimigo.direcaoOlhar)) {
+            inimigo.vx = passoX;
+            inimigo.x = proximoX;
+          } else {
+            inimigo.vx = 0;
+          }
           const onda = Math.sin(estadoJogo.frameAtual * 0.16 + inimigo.faseCobra);
           inimigo.y = CHAO_Y - inimigo.altura - Math.abs(onda) * 2.5;
         }
@@ -2086,19 +2220,38 @@ function atualizarInimigos() {
         inimigo.y = CHAO_Y - inimigo.altura - Math.abs(onda) * 1.5;
       }
     } else if (inimigo.tipo === "voador_acido") {
-      inimigo.x += inimigo.vx;
-      inimigo.y = inimigo.yBase + Math.sin(estadoJogo.frameAtual * 0.08 + inimigo.faseAsa) * 18;
+      const distSoldado = Math.hypot(
+        centroSoldadoX - (inimigo.x + inimigo.largura / 2),
+        centroSoldadoY - (inimigo.y + inimigo.altura / 2)
+      );
 
-      const dentroDaTelaVisivel =
-        inimigo.x + inimigo.largura > estadoJogo.cameraX + 20 &&
-        inimigo.x < estadoJogo.cameraX + canvas.width - 20;
+      if (!inimigo.ativoPatrulha && distSoldado <= inimigo.raioDeteccao) {
+        inimigo.ativoPatrulha = true;
+        inimigo.direcaoVoo = centroSoldadoX < inimigo.x + inimigo.largura / 2 ? -1 : 1;
+        inimigo.ultimoAcidoFrame = estadoJogo.frameAtual - inimigo.cadenciaAcido + 35;
+      }
 
-      if (
-        dentroDaTelaVisivel &&
-        estadoJogo.frameAtual - inimigo.ultimoAcidoFrame >= inimigo.cadenciaAcido
-      ) {
-        cuspirAcidoEmDirecaoAoSoldado(inimigo);
-        inimigo.ultimoAcidoFrame = estadoJogo.frameAtual;
+      if (inimigo.ativoPatrulha) {
+        const velPatrulha = 1.9;
+        inimigo.x += inimigo.direcaoVoo * velPatrulha;
+
+        if (inimigo.x <= inimigo.xAncora - inimigo.amplitudePatrulha) {
+          inimigo.x = inimigo.xAncora - inimigo.amplitudePatrulha;
+          inimigo.direcaoVoo = 1;
+        } else if (inimigo.x >= inimigo.xAncora + inimigo.amplitudePatrulha) {
+          inimigo.x = inimigo.xAncora + inimigo.amplitudePatrulha;
+          inimigo.direcaoVoo = -1;
+        }
+
+        inimigo.y = inimigo.yBase + Math.sin(estadoJogo.frameAtual * 0.07 + inimigo.faseAsa) * 14;
+
+        if (estadoJogo.frameAtual - inimigo.ultimoAcidoFrame >= inimigo.cadenciaAcido) {
+          cuspirAcidoEmDirecaoAoSoldado(inimigo);
+          inimigo.ultimoAcidoFrame = estadoJogo.frameAtual;
+        }
+      } else {
+        inimigo.y = inimigo.yBase + Math.sin(estadoJogo.frameAtual * 0.04 + inimigo.faseAsa) * 4;
+        inimigo.direcaoVoo = centroSoldadoX < inimigo.x + inimigo.largura / 2 ? -1 : 1;
       }
     } else {
       inimigo.x += inimigo.vx;
@@ -2114,8 +2267,8 @@ function atualizarInimigos() {
       aplicarDanoSoldado(15, direcaoImpacto);
     }
 
-    const foraEsquerda = inimigo.x + inimigo.largura < estadoJogo.cameraX - 140;
-    const foraDireita = inimigo.x > estadoJogo.cameraX + canvas.width + 140;
+    const foraEsquerda = inimigo.x + inimigo.largura < estadoJogo.cameraX - 160;
+    const foraDireita = inimigo.x > estadoJogo.cameraX + canvas.width + 160;
     if (foraEsquerda || foraDireita) {
       estadoJogo.inimigos.splice(i, 1);
     }
@@ -2289,7 +2442,8 @@ function atualizarProjeteis() {
     const foraDaTela =
       tiro.x < estadoJogo.cameraX - 40 ||
       tiro.x > estadoJogo.cameraX + canvas.width + 40 ||
-      tiro.y < -40;
+      tiro.y < -40 ||
+      tiro.y > CHAO_Y + 20;
 
     if (acertou || foraDaTela) {
       estadoJogo.tirosJogador.splice(i, 1);
@@ -2338,7 +2492,7 @@ function atualizarProjeteis() {
     if (
       tiro.x < estadoJogo.cameraX - 50 ||
       tiro.x > estadoJogo.cameraX + canvas.width + 50 ||
-      tiro.y > CHAO_Y + 10
+      tiro.y > canvas.height + 10
     ) {
       estadoJogo.tirosInimigos.splice(i, 1);
     }
@@ -2410,7 +2564,7 @@ function aplicarDanoSoldado(dano, direcaoImpacto = -1) {
   }
 
   if (soldado.vida <= 0) {
-    finalizarDerrota();
+    finalizarDerrota(false);
   }
 }
 
@@ -2465,16 +2619,17 @@ function desenharHudNoCanvas(configNivel) {
   ctx.strokeStyle = "#2f3e52";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.roundRect(14, 12, 390, 28, 6);
+  ctx.roundRect(14, 12, 430, 28, 6);
   ctx.fill();
   ctx.stroke();
 
+  const miraTag = soldado.mirandoParado ? "  |  MIRA TRAVADA (K/X)" : "";
   ctx.fillStyle = "#e6edf3";
   ctx.font = "bold 12px Segoe UI, sans-serif";
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.fillText(
-    `FASE ${configNivel.numero}/3   |   VIDA ${soldado.vida}   |   PONTOS ${estadoJogo.pontuacao}   |   ${pct}%`,
+    `FASE ${configNivel.numero}/3   |   VIDA ${soldado.vida}   |   PONTOS ${estadoJogo.pontuacao}   |   ${pct}%${miraTag}`,
     24,
     26
   );
@@ -2561,7 +2716,7 @@ function desenharMapaLobbyCuphead() {
     ctx.strokeStyle = desbloqueada ? "#f0b429" : "#475569";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.roundRect(no.x - 84, no.y + no.raio + 10, 168, 38, 6);
+    ctx.roundRect(no.x - 98, no.y + no.raio + 10, 196, 38, 6);
     ctx.fill();
     ctx.stroke();
 
@@ -2968,6 +3123,41 @@ function desenharBuracosChao() {
   }
 }
 
+function desenharChaoComAbismosSemFundo(configNivel) {
+  const alturaChao = canvas.height - CHAO_Y;
+  const abismosOrdenados = [...estadoJogo.abismosSemFundo].sort((a, b) => a.x - b.x);
+  let cursorX = 0;
+
+  for (let i = 0; i < abismosOrdenados.length; i++) {
+    const ab = abismosOrdenados[i];
+    const larguraSegmento = Math.max(0, ab.x - cursorX);
+    if (larguraSegmento > 0) {
+      ctx.fillStyle = configNivel.corChao;
+      ctx.fillRect(cursorX, CHAO_Y, larguraSegmento, alturaChao);
+      ctx.fillStyle = "#433b4a";
+      ctx.fillRect(cursorX, CHAO_Y, larguraSegmento, 6);
+    }
+
+    // Paredes laterais escuras do abismo sem fundo
+    ctx.fillStyle = "#08090d";
+    ctx.fillRect(ab.x, CHAO_Y, ab.largura, alturaChao);
+
+    ctx.fillStyle = "#3a3242";
+    ctx.fillRect(ab.x - 4, CHAO_Y, 6, 10);
+    ctx.fillRect(ab.x + ab.largura - 2, CHAO_Y, 6, 10);
+
+    cursorX = ab.x + ab.largura;
+  }
+
+  const larguraFinal = configNivel.distanciaMeta + 200 - cursorX;
+  if (larguraFinal > 0) {
+    ctx.fillStyle = configNivel.corChao;
+    ctx.fillRect(cursorX, CHAO_Y, larguraFinal, alturaChao);
+    ctx.fillStyle = "#433b4a";
+    ctx.fillRect(cursorX, CHAO_Y, larguraFinal, 6);
+  }
+}
+
 function desenharEstruturasQuebradas() {
   for (let i = 0; i < estadoJogo.estruturasQuebradas.length; i++) {
     const est = estadoJogo.estruturasQuebradas[i];
@@ -3013,7 +3203,6 @@ function desenharCenarioCaverna(configNivel) {
   ctx.fillStyle = gradCeu;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Cristais bioluminescentes sutis no fundo da caverna
   ctx.save();
   ctx.translate(-estadoJogo.cameraX * 0.25, 0);
   for (let cx = 140; cx < configNivel.distanciaMeta; cx += 340) {
@@ -3027,7 +3216,6 @@ function desenharCenarioCaverna(configNivel) {
   }
   ctx.restore();
 
-  // Estalactites no teto da caverna
   ctx.save();
   ctx.translate(-estadoJogo.cameraX * 0.65, 0);
   for (let sx = 40; sx < configNivel.distanciaMeta + 200; sx += 95) {
@@ -3050,15 +3238,10 @@ function desenharCenarioCaverna(configNivel) {
   }
   ctx.restore();
 
-  // Solo da caverna e rochas/blocos no chão para o soldado subir e fugir
   ctx.save();
   ctx.translate(-estadoJogo.cameraX, 0);
 
-  ctx.fillStyle = configNivel.corChao;
-  ctx.fillRect(0, CHAO_Y, configNivel.distanciaMeta + 200, canvas.height - CHAO_Y);
-
-  ctx.fillStyle = "#433b4a";
-  ctx.fillRect(0, CHAO_Y, configNivel.distanciaMeta + 200, 6);
+  desenharChaoComAbismosSemFundo(configNivel);
 
   for (let i = 0; i < estadoJogo.obstaculos.length; i++) {
     const obs = estadoJogo.obstaculos[i];
@@ -3074,7 +3257,6 @@ function desenharCenarioCaverna(configNivel) {
     ctx.closePath();
     ctx.fill();
 
-    // Topo plano/rochoso que serve de apoio para o soldado ficar em cima
     ctx.fillStyle = "#4b4356";
     ctx.fillRect(obs.x + 6, obs.y, obs.largura - 12, 8);
 
@@ -3227,104 +3409,104 @@ function desenharVoadorAcidoRealista(inimigo) {
   const dir = inimigo.direcaoVoo || -1;
   const centroX = inimigo.x + inimigo.largura / 2;
   const centroY = inimigo.y + inimigo.altura / 2;
-  const batidaAsa = Math.sin(estadoJogo.frameAtual * 0.34 + inimigo.faseAsa);
+  const frequenciaAsa = inimigo.ativoPatrulha ? 0.28 : 0.11;
+  const amplitudeAsa = inimigo.ativoPatrulha ? 15 : 6;
+  const batidaAsa = Math.sin(estadoJogo.frameAtual * frequenciaAsa + inimigo.faseAsa);
 
   ctx.save();
   ctx.translate(centroX, centroY);
   ctx.scale(dir, 1);
 
-  // Membrana da asa traseira (mais escura para profundidade)
-  const asaTrasY = -batidaAsa * 14 - 4;
-  ctx.fillStyle = emDano ? "#ffd43b" : "#3a2d4f";
+  // Asa traseira
+  const asaTrasY = -batidaAsa * amplitudeAsa - 3;
+  ctx.fillStyle = emDano ? "#ffd43b" : "#3a2e47";
   ctx.beginPath();
-  ctx.moveTo(2, -4);
-  ctx.quadraticCurveTo(10, asaTrasY - 12, 26, asaTrasY + 2);
-  ctx.quadraticCurveTo(16, asaTrasY + 12, 4, 4);
+  ctx.moveTo(2, -3);
+  ctx.quadraticCurveTo(11, asaTrasY - 11, 25, asaTrasY + 1);
+  ctx.quadraticCurveTo(15, asaTrasY + 10, 4, 3);
   ctx.closePath();
   ctx.fill();
 
-  // Membrana da asa dianteira com nervuras orgânicas
-  const asaFrenteY = batidaAsa * 16 - 5;
-  const gradAsa = ctx.createLinearGradient(-2, -6, -24, asaFrenteY + 10);
-  gradAsa.addColorStop(0, emDano ? "#ffffff" : "#6d4c7d");
-  gradAsa.addColorStop(1, emDano ? "#ff8787" : "#382542");
+  // Asa dianteira com contorno nítido e nervuras
+  const asaFrenteY = batidaAsa * (amplitudeAsa + 2) - 4;
+  const gradAsa = ctx.createLinearGradient(-2, -5, -26, asaFrenteY + 9);
+  gradAsa.addColorStop(0, emDano ? "#ffffff" : "#6c537a");
+  gradAsa.addColorStop(1, emDano ? "#ff8787" : "#32233b");
 
   ctx.fillStyle = gradAsa;
-  ctx.strokeStyle = "#17111c";
+  ctx.strokeStyle = "#140f17";
   ctx.lineWidth = 1.6;
   ctx.beginPath();
   ctx.moveTo(-2, -3);
-  ctx.quadraticCurveTo(-14, asaFrenteY - 14, -28, asaFrenteY + 2);
-  ctx.quadraticCurveTo(-22, asaFrenteY + 13, -12, asaFrenteY + 7);
-  ctx.quadraticCurveTo(-6, asaFrenteY + 14, -2, 5);
+  ctx.quadraticCurveTo(-13, asaFrenteY - 13, -27, asaFrenteY + 1);
+  ctx.quadraticCurveTo(-21, asaFrenteY + 11, -11, asaFrenteY + 6);
+  ctx.quadraticCurveTo(-6, asaFrenteY + 12, -2, 4);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
-  // Nervuras da asa
-  ctx.strokeStyle = "rgba(216, 245, 162, 0.28)";
-  ctx.lineWidth = 1.1;
+  ctx.strokeStyle = "rgba(216, 245, 162, 0.22)";
+  ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(-4, -2);
-  ctx.lineTo(-24, asaFrenteY + 2);
+  ctx.lineTo(-23, asaFrenteY + 1);
   ctx.moveTo(-4, 0);
-  ctx.lineTo(-16, asaFrenteY + 9);
+  ctx.lineTo(-15, asaFrenteY + 8);
   ctx.stroke();
 
-  // Abdômen/corpo orgânico alongado da criatura de caverna
-  const gradCorpo = ctx.createRadialGradient(-2, -2, 2, 0, 1, 16);
-  gradCorpo.addColorStop(0, emDano ? "#ffffff" : "#8b6396");
-  gradCorpo.addColorStop(1, emDano ? "#ff8787" : "#34223d");
+  // Corpo fuselado da criatura alada
+  const gradCorpo = ctx.createRadialGradient(-2, -2, 2, 0, 1, 15);
+  gradCorpo.addColorStop(0, emDano ? "#ffffff" : "#806191");
+  gradCorpo.addColorStop(1, emDano ? "#ff8787" : "#2c1e33");
 
   ctx.fillStyle = gradCorpo;
-  ctx.strokeStyle = "#140e18";
-  ctx.lineWidth = 1.8;
+  ctx.strokeStyle = "#120c14";
+  ctx.lineWidth = 1.7;
   ctx.beginPath();
-  ctx.ellipse(2, 1, 13, 9.5, -0.1, 0, Math.PI * 2);
+  ctx.ellipse(2, 1, 13, 8.5, -0.08, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
-  // Crista dorsal espinhosa
-  ctx.fillStyle = emDano ? "#ffd43b" : "#94d82d";
+  // Cauda pontiaguda
+  ctx.fillStyle = emDano ? "#ffffff" : "#3a2842";
   ctx.beginPath();
-  ctx.moveTo(8, -7);
-  ctx.lineTo(13, -13);
-  ctx.lineTo(15, -5);
-  ctx.moveTo(1, -8);
-  ctx.lineTo(4, -14);
-  ctx.lineTo(7, -7);
+  ctx.moveTo(13, -1);
+  ctx.lineTo(22, 1);
+  ctx.lineTo(13, 4);
   ctx.closePath();
   ctx.fill();
 
-  // Cabeça com presas e glândula de ácido brilhante
-  ctx.fillStyle = emDano ? "#ffffff" : "#593b66";
+  // Cabeça com presas e olho brilhante
+  ctx.fillStyle = emDano ? "#ffffff" : "#4a3354";
   ctx.beginPath();
-  ctx.ellipse(-9, 1, 8, 7, 0.1, 0, Math.PI * 2);
+  ctx.ellipse(-9, 1, 7.5, 6.5, 0.08, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
-  // Olho brilhante âmbar/ácido
   ctx.fillStyle = "#d8f5a2";
   ctx.beginPath();
-  ctx.arc(-12, -1.5, 2.8, 0, Math.PI * 2);
+  ctx.arc(-11.5, -1.2, 2.5, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = "#120c14";
-  ctx.fillRect(-13, -3, 1.5, 3);
+  ctx.fillRect(-12, -2.5, 1.3, 2.6);
 
-  // Presas afiadas e gota de ácido na boca
   ctx.fillStyle = "#f1f3f5";
   ctx.beginPath();
-  ctx.moveTo(-15, 4);
-  ctx.lineTo(-18, 9);
-  ctx.lineTo(-12, 6);
+  ctx.moveTo(-14.5, 4);
+  ctx.lineTo(-17.5, 8.5);
+  ctx.lineTo(-11.5, 5.5);
   ctx.closePath();
   ctx.fill();
 
-  const pulsoAcido = 2.2 + Math.sin(estadoJogo.frameAtual * 0.25) * 0.8;
-  ctx.fillStyle = "#82c91e";
-  ctx.beginPath();
-  ctx.arc(-17, 6, pulsoAcido, 0, Math.PI * 2);
-  ctx.fill();
+  // Gota de ácido quando está prestes a atirar (a cada 5s)
+  const tempoDesdeTiro = estadoJogo.frameAtual - inimigo.ultimoAcidoFrame;
+  const prestesAtirar = inimigo.ativoPatrulha && inimigo.cadenciaAcido - tempoDesdeTiro <= 35;
+  if (prestesAtirar) {
+    ctx.fillStyle = "#94d82d";
+    ctx.beginPath();
+    ctx.arc(-16.5, 6.5, 2.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   ctx.restore();
   desenharBarraVidaInimigo(inimigo);
@@ -3516,6 +3698,8 @@ function desenharSoldado() {
   const centroX = soldado.x + soldado.largura / 2;
   const baseY = soldado.y + soldado.alturaAtual;
   const andando =
+    !soldado.mirandoParado &&
+    !soldado.caindoNoAbismo &&
     (Math.abs(soldado.vx) > 0.1 || Math.abs(soldado.vy) > 0.1) &&
     (soldado.noChao || estadoJogo.status === "lobby");
   const paradoNoChao = !andando && soldado.noChao;
@@ -3530,6 +3714,15 @@ function desenharSoldado() {
 
   if (emDano) {
     ctx.rotate(estadoJogo.inclinacaoDano);
+  }
+
+  let anguloArma = 0;
+  if (soldado.mirandoParado) {
+    const dxLocal = soldado.miraDx * soldado.direcao;
+    const dyLocal = soldado.miraDy;
+    anguloArma = Math.atan2(dyLocal, dxLocal === 0 ? 0.0001 : dxLocal);
+  } else if (soldado.olhandoCima) {
+    anguloArma = -Math.PI / 2;
   }
 
   if (soldado.deitado) {
@@ -3569,7 +3762,7 @@ function desenharSoldado() {
     ctx.fillStyle = "#4a634e";
     ctx.fillRect(2 + movimentoCotovelo * 0.5, -6 + Math.min(0, movimentoCotovelo * 0.4), 8, 5);
 
-    desenharFuzil(11 + impulsoRastejarX * 0.4, -9 + elevacaoTroncoY * 0.6, 0, atirouAgora);
+    desenharFuzil(11 + impulsoRastejarX * 0.4, -9 + elevacaoTroncoY * 0.6, anguloArma, atirouAgora);
   } else {
     const deslocamentoPerna = soldado.noChao || estadoJogo.status === "lobby" ? cicloPasso * 7 : 5;
     const elevacaoPulo = soldado.noChao || estadoJogo.status === "lobby" ? 0 : -4;
@@ -3622,11 +3815,7 @@ function desenharSoldado() {
     ctx.fillStyle = "#38bdf8";
     ctx.fillRect(1, -52 + balancoTronco, 6, 3.5);
 
-    if (soldado.olhandoCima) {
-      desenharFuzil(3, -38 + balancoTronco, -Math.PI / 2, atirouAgora);
-    } else {
-      desenharFuzil(2, -35 + balancoTronco, 0, atirouAgora);
-    }
+    desenharFuzil(2, -35 + balancoTronco, anguloArma, atirouAgora);
   }
 
   ctx.restore();
@@ -3843,7 +4032,7 @@ function loopPrincipal() {
   } else if (estadoJogo.status === "jogando") {
     estadoJogo.frameAtual++;
     atualizarPlataformas();
-    atualizarSoldado();
+    atualizarMiraESoldado();
     gerarInimigos();
     atualizarInimigos();
     atualizarCaminhosSubterraneos();

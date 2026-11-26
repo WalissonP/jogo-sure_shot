@@ -137,7 +137,7 @@ body {
 
 .painel-menu {
   width: 100%;
-  max-width: 440px;
+  max-width: 460px;
   background-color: #17202c;
   border: 2px solid #2f3e52;
   border-radius: 10px;
@@ -211,7 +211,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   color: #cbd5e1;
   margin-bottom: 6px;
 }
@@ -221,7 +221,7 @@ body {
   background-color: #2f3e52;
   padding: 2px 6px;
   border-radius: 4px;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
 }
 
 .placar-final {
