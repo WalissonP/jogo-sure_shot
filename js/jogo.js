@@ -1054,7 +1054,6 @@ function posicionarRastejadoresMapa() {
 }
 
 function posicionarRastejadoresFase2() {
-  // Bem espaçados ao longo dos 3100px da fase 2, alternando rastejadores normais e azuis saltadores
   const pontosFase2 = [
     { x: 440, alcance: 230, velocidadeAtaque: 1.5, variante: "normal" },
     { x: 680, alcance: 235, velocidadeAtaque: 1.55, variante: "azul" },
@@ -1077,7 +1076,6 @@ function posicionarRastejadoresFase2() {
 }
 
 function posicionarVoadoresFase2() {
-  // Distribuídos em intervalos largos ao longo do percurso para não concentrar no início
   const locaisVoadores = [
     { x: 560, y: 155, raioDeteccao: 270, amplitudePatrulha: 115, offsetTiro: 0 },
     { x: 1020, y: 140, raioDeteccao: 275, amplitudePatrulha: 125, offsetTiro: 80 },
@@ -2107,17 +2105,16 @@ function atualizarInimigos() {
         const abismoAFrente = rastejadorAtingiriaAbismo(proximoX, inimigo.largura, inimigo.direcaoOlhar);
 
         if (ehAzul) {
-          // Rastejador azul: pula em vez de cavar para superar obstáculos ou tentar alcançar o soldado
+          // Rastejador azul: não tenta pular obstáculos; só salta se o soldado estiver acima
           const soldadoAcima = soldado.y + soldado.alturaAtual < CHAO_Y - 22 && distanciaAbs < 165;
-          if ((obsAFrente || soldadoAcima) && inimigo.cooldownPuloAzul <= 0 && !abismoAFrente) {
+          if (soldadoAcima && inimigo.cooldownPuloAzul <= 0 && !abismoAFrente) {
             inimigo.estado = "saltando_azul";
-            inimigo.vx = inimigo.direcaoOlhar * (inimigo.velocidadeAtaque * 1.45);
-            inimigo.vy = soldadoAcima ? -10.8 : -9.4;
+            inimigo.vx = inimigo.direcaoOlhar * (inimigo.velocidadeAtaque * 1.25);
+            inimigo.vy = -10.4;
             inimigo.cooldownPuloAzul = 55;
             inimigo.x += inimigo.vx;
             inimigo.y += inimigo.vy;
           } else if (estaLogoAbaixoDoSoldado || abismoAFrente) {
-            // Fica parado sem tremer quando já está sob o soldado ou na beira do abismo
             inimigo.vx = 0;
             inimigo.y = CHAO_Y - inimigo.altura;
           } else {
@@ -3583,6 +3580,14 @@ function desenharRastejadorAlien(inimigo) {
   const saindo = inimigo.estado === "saindo_terra";
   const dir = inimigo.direcaoOlhar || -1;
   const emDano = inimigo.danoFrames > 0;
+  const emAlerta = inimigo.estado !== "esperando";
+  const corOlho = emDano
+    ? "#ff2a55"
+    : ehAzul
+    ? "#fff3bf"
+    : emAlerta
+    ? "#e03131"
+    : "#ddb892";
 
   const corSegmentoPar = ehAzul ? "#339af0" : "#9c6644";
   const corSegmentoImpar = ehAzul ? "#1c7ed6" : "#7f5539";
@@ -3664,7 +3669,7 @@ function desenharRastejadorAlien(inimigo) {
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = emDano ? "#ff2a55" : "#e03131";
+    ctx.fillStyle = corOlho;
     ctx.beginPath();
     ctx.arc(-2, -3, 3.2, 0, Math.PI * 2);
     ctx.fill();
@@ -3738,7 +3743,7 @@ function desenharRastejadorAlien(inimigo) {
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = emDano ? "#ff2a55" : ehAzul ? "#fff3bf" : "#e03131";
+  ctx.fillStyle = corOlho;
   ctx.beginPath();
   ctx.arc(cabecaX - 2, cabecaY - 3, 3.2, 0, Math.PI * 2);
   ctx.fill();
