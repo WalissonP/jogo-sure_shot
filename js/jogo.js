@@ -986,13 +986,12 @@ function configurarMapaFase1(distanciaMeta) {
 }
 
 function configurarMapaFase2Caverna(distanciaMeta) {
-  // Buracos sem fundo no chão: ao cair neles, o soldado morre
   const abismos = [
-    { x: 500, largura: 82 },
-    { x: 1020, largura: 90 },
-    { x: 1560, largura: 86 },
-    { x: 2100, largura: 94 },
-    { x: 2640, largura: 88 }
+    { x: 520, largura: 82 },
+    { x: 1080, largura: 90 },
+    { x: 1640, largura: 86 },
+    { x: 2200, largura: 94 },
+    { x: 2740, largura: 88 }
   ];
 
   for (let i = 0; i < abismos.length; i++) {
@@ -1003,14 +1002,13 @@ function configurarMapaFase2Caverna(distanciaMeta) {
     });
   }
 
-  // Blocos e formações rochosas no chão para o soldado subir e fugir dos inimigos
   const formacoesChao = [
-    { x: 340, largura: 84, altura: 46, tipo: "rocha_elevada" },
-    { x: 760, largura: 110, altura: 66, tipo: "rocha_elevada" },
-    { x: 1240, largura: 82, altura: 46, tipo: "rocha_elevada" },
-    { x: 1760, largura: 114, altura: 70, tipo: "rocha_elevada" },
-    { x: 2290, largura: 92, altura: 54, tipo: "rocha_elevada" },
-    { x: 2810, largura: 96, altura: 58, tipo: "rocha_elevada" }
+    { x: 350, largura: 84, altura: 46, tipo: "rocha_elevada" },
+    { x: 820, largura: 110, altura: 66, tipo: "rocha_elevada" },
+    { x: 1360, largura: 82, altura: 46, tipo: "rocha_elevada" },
+    { x: 1900, largura: 114, altura: 70, tipo: "rocha_elevada" },
+    { x: 2440, largura: 92, altura: 54, tipo: "rocha_elevada" },
+    { x: 2920, largura: 96, altura: 58, tipo: "rocha_elevada" }
   ];
 
   for (let i = 0; i < formacoesChao.length; i++) {
@@ -1024,12 +1022,13 @@ function configurarMapaFase2Caverna(distanciaMeta) {
     });
   }
 
-  // Saliências/plataformas de pedra da caverna para escalada e fuga rápida
-  for (let px = 620; px < distanciaMeta - 340; px += 560) {
+  for (let i = 0; i < abismos.length; i++) {
+    const ab = abismos[i];
+    const centroAbismo = ab.x + ab.largura / 2;
     estadoJogo.plataformas.push({
-      x: px,
+      x: centroAbismo - 62,
       y: CHAO_Y - 108,
-      largura: 120,
+      largura: 124,
       altura: 18,
       tipo: "caverna",
       desmoronavel: false
@@ -1039,57 +1038,74 @@ function configurarMapaFase2Caverna(distanciaMeta) {
 
 function posicionarRastejadoresMapa() {
   const pontosMapa = [
-    { x: 520, alcance: 245, velocidadeAtaque: 1.35 },
-    { x: 960, alcance: 260, velocidadeAtaque: 1.45 },
-    { x: 1340, alcance: 265, velocidadeAtaque: 1.55 },
-    { x: 1690, alcance: 255, velocidadeAtaque: 1.65 },
-    { x: 2020, alcance: 250, velocidadeAtaque: 1.75 }
+    { x: 540, alcance: 230, velocidadeAtaque: 1.35, variante: "normal" },
+    { x: 860, alcance: 235, velocidadeAtaque: 1.4, variante: "azul" },
+    { x: 1220, alcance: 240, velocidadeAtaque: 1.5, variante: "normal" },
+    { x: 1580, alcance: 240, velocidadeAtaque: 1.55, variante: "azul" },
+    { x: 1960, alcance: 245, velocidadeAtaque: 1.65, variante: "normal" }
   ];
 
   for (let i = 0; i < pontosMapa.length; i++) {
     const ponto = pontosMapa[i];
-    estadoJogo.inimigos.push(criarRastejador(ponto.x, ponto.alcance, ponto.velocidadeAtaque, i));
+    estadoJogo.inimigos.push(
+      criarRastejador(ponto.x, ponto.alcance, ponto.velocidadeAtaque, i, ponto.variante)
+    );
   }
 }
 
 function posicionarRastejadoresFase2() {
+  // Bem espaçados ao longo dos 3100px da fase 2, alternando rastejadores normais e azuis saltadores
   const pontosFase2 = [
-    { x: 430, alcance: 240, velocidadeAtaque: 1.5 },
-    { x: 670, alcance: 250, velocidadeAtaque: 1.6 },
-    { x: 920, alcance: 255, velocidadeAtaque: 1.65 },
-    { x: 1180, alcance: 260, velocidadeAtaque: 1.7 },
-    { x: 1450, alcance: 265, velocidadeAtaque: 1.75 },
-    { x: 1700, alcance: 260, velocidadeAtaque: 1.8 },
-    { x: 1980, alcance: 270, velocidadeAtaque: 1.85 },
-    { x: 2240, alcance: 265, velocidadeAtaque: 1.85 },
-    { x: 2520, alcance: 275, velocidadeAtaque: 1.9 },
-    { x: 2770, alcance: 270, velocidadeAtaque: 1.9 }
+    { x: 440, alcance: 230, velocidadeAtaque: 1.5, variante: "normal" },
+    { x: 680, alcance: 235, velocidadeAtaque: 1.55, variante: "azul" },
+    { x: 940, alcance: 235, velocidadeAtaque: 1.6, variante: "normal" },
+    { x: 1220, alcance: 240, velocidadeAtaque: 1.65, variante: "azul" },
+    { x: 1480, alcance: 240, velocidadeAtaque: 1.7, variante: "normal" },
+    { x: 1760, alcance: 245, velocidadeAtaque: 1.7, variante: "azul" },
+    { x: 2040, alcance: 245, velocidadeAtaque: 1.75, variante: "normal" },
+    { x: 2340, alcance: 250, velocidadeAtaque: 1.8, variante: "azul" },
+    { x: 2600, alcance: 250, velocidadeAtaque: 1.85, variante: "normal" },
+    { x: 2860, alcance: 255, velocidadeAtaque: 1.9, variante: "azul" }
   ];
 
   for (let i = 0; i < pontosFase2.length; i++) {
     const p = pontosFase2[i];
-    estadoJogo.inimigos.push(criarRastejador(p.x, p.alcance, p.velocidadeAtaque, i + 10));
+    estadoJogo.inimigos.push(
+      criarRastejador(p.x, p.alcance, p.velocidadeAtaque, i + 10, p.variante)
+    );
   }
 }
 
 function posicionarVoadoresFase2() {
-  // Voadores posicionados em pontos do mapa; só decolam e patrulham quando o soldado se aproxima
+  // Distribuídos em intervalos largos ao longo do percurso para não concentrar no início
   const locaisVoadores = [
-    { x: 650, y: 155, raioDeteccao: 290, amplitudePatrulha: 130 },
-    { x: 1360, y: 145, raioDeteccao: 300, amplitudePatrulha: 145 },
-    { x: 2020, y: 160, raioDeteccao: 300, amplitudePatrulha: 140 },
-    { x: 2580, y: 148, raioDeteccao: 310, amplitudePatrulha: 145 }
+    { x: 560, y: 155, raioDeteccao: 270, amplitudePatrulha: 115, offsetTiro: 0 },
+    { x: 1020, y: 140, raioDeteccao: 275, amplitudePatrulha: 125, offsetTiro: 80 },
+    { x: 1520, y: 165, raioDeteccao: 275, amplitudePatrulha: 125, offsetTiro: 160 },
+    { x: 2020, y: 142, raioDeteccao: 280, amplitudePatrulha: 130, offsetTiro: 240 },
+    { x: 2520, y: 158, raioDeteccao: 280, amplitudePatrulha: 130, offsetTiro: 60 },
+    { x: 2940, y: 138, raioDeteccao: 285, amplitudePatrulha: 120, offsetTiro: 140 }
   ];
 
   for (let i = 0; i < locaisVoadores.length; i++) {
     const lv = locaisVoadores[i];
-    estadoJogo.inimigos.push(criarVoadorAcido(lv.x, lv.y, lv.raioDeteccao, lv.amplitudePatrulha, i * 1.4));
+    const voador = criarVoadorAcido(lv.x, lv.y, lv.raioDeteccao, lv.amplitudePatrulha, i * 1.35);
+    voador.ultimoAcidoFrame = -voador.cadenciaAcido + lv.offsetTiro;
+    estadoJogo.inimigos.push(voador);
   }
 }
 
-function criarRastejador(x, alcance = 250, velocidadeAtaque = 1.5, indice = 0) {
+function criarRastejador(
+  x,
+  alcance = 240,
+  velocidadeAtaque = 1.5,
+  indice = 0,
+  variante = "normal"
+) {
+  const ehAzul = variante === "azul";
   return {
     tipo: "rastejador",
+    variante: ehAzul ? "azul" : "normal",
     x: x,
     y: CHAO_Y - 26,
     largura: 52,
@@ -1099,7 +1115,7 @@ function criarRastejador(x, alcance = 250, velocidadeAtaque = 1.5, indice = 0) {
     vida: 2,
     vidaMaxima: 2,
     mostrarBarraVida: false,
-    pontos: 75,
+    pontos: ehAzul ? 90 : 75,
     estado: "esperando",
     obstaculoAlvo: null,
     buracoEntradaId: null,
@@ -1108,14 +1124,15 @@ function criarRastejador(x, alcance = 250, velocidadeAtaque = 1.5, indice = 0) {
     ocultoNaTerra: false,
     alcanceAtaque: alcance,
     velocidadeAtaque: velocidadeAtaque,
+    cooldownPuloAzul: 0,
     direcaoOlhar: -1,
     faseCobra: indice * 1.1,
     danoFrames: 0,
-    cor: "#9c6644"
+    cor: ehAzul ? "#339af0" : "#9c6644"
   };
 }
 
-function criarVoadorAcido(x, yBase, raioDeteccao = 290, amplitudePatrulha = 135, faseSeed = 0) {
+function criarVoadorAcido(x, yBase, raioDeteccao = 280, amplitudePatrulha = 125, faseSeed = 0) {
   return {
     tipo: "voador_acido",
     x: x,
@@ -1137,7 +1154,6 @@ function criarVoadorAcido(x, yBase, raioDeteccao = 290, amplitudePatrulha = 135,
     pontos: 100,
     danoFrames: 0,
     cor: "#6d4c7d",
-    // Dispara a cada 5 segundos (300 frames a 60 FPS) após começar a voar
     ultimoAcidoFrame: -300,
     cadenciaAcido: FPS_ESTIMADO * 5
   };
@@ -1769,18 +1785,20 @@ function dispararTiroSoldado() {
     const mag = Math.hypot(dx, dy) || 1;
     const vx = (dx / mag) * velocidadeTiro;
     const vy = (dy / mag) * velocidadeTiro;
+    const angulo = Math.atan2(vy, vx);
 
     const origemX = soldado.x + soldado.largura / 2 + dx * 16;
     const origemY = soldado.y + soldado.alturaAtual * 0.45 + dy * 16;
     const nivelTiro = dy > 0 && dx === 0 ? "baixo" : dy < 0 && dx === 0 ? "alto" : "medio";
 
     estadoJogo.tirosJogador.push({
-      x: origemX - 5,
-      y: origemY - 5,
-      largura: Math.abs(vx) >= Math.abs(vy) ? 14 : 8,
-      altura: Math.abs(vy) > Math.abs(vx) ? 14 : 8,
+      x: origemX - 7,
+      y: origemY - 3,
+      largura: 14,
+      altura: 6,
       vx: vx,
       vy: vy,
+      angulo: angulo,
       dano: 1,
       nivelTiro: nivelTiro
     });
@@ -1791,10 +1809,11 @@ function dispararTiroSoldado() {
     estadoJogo.tirosJogador.push({
       x: soldado.x + soldado.largura / 2 - 3,
       y: soldado.y - 10,
-      largura: 6,
-      altura: 14,
+      largura: 14,
+      altura: 6,
       vx: 0,
       vy: -velocidadeTiro,
+      angulo: -Math.PI / 2,
       dano: 1,
       nivelTiro: "alto"
     });
@@ -1808,6 +1827,7 @@ function dispararTiroSoldado() {
       altura: 6,
       vx: velocidadeTiro * soldado.direcao,
       vy: 0,
+      angulo: soldado.direcao === 1 ? 0 : Math.PI,
       dano: 1,
       nivelTiro: "baixo"
     });
@@ -1821,6 +1841,7 @@ function dispararTiroSoldado() {
       altura: 6,
       vx: velocidadeTiro * soldado.direcao,
       vy: 0,
+      angulo: soldado.direcao === 1 ? 0 : Math.PI,
       dano: 1,
       nivelTiro: "medio"
     });
@@ -1842,15 +1863,16 @@ function gerarInimigos() {
   }
 
   const spawnX = canvas.width - 40;
-  estadoJogo.inimigos.push(criarRastejador(spawnX, 250, 1.55, estadoJogo.frameAtual));
+  const variante = estadoJogo.frameAtual % 2 === 0 ? "azul" : "normal";
+  estadoJogo.inimigos.push(criarRastejador(spawnX, 250, 1.55, estadoJogo.frameAtual, variante));
 }
 
 function encontrarObstaculoAFrente(inimigo, dir) {
-  const proximoX = dir === 1 ? inimigo.x + inimigo.largura + 18 : inimigo.x - 32;
+  const proximoX = dir === 1 ? inimigo.x + inimigo.largura + 16 : inimigo.x - 30;
   const caixaFrente = {
     x: proximoX,
     y: CHAO_Y - 26,
-    largura: 32,
+    largura: 30,
     altura: 26
   };
 
@@ -2063,6 +2085,11 @@ function atualizarInimigos() {
       const centroInimigoX = inimigo.x + inimigo.largura / 2;
       const distanciaX = centroSoldadoX - centroInimigoX;
       const distanciaAbs = Math.abs(distanciaX);
+      const ehAzul = inimigo.variante === "azul";
+
+      if (inimigo.cooldownPuloAzul > 0) {
+        inimigo.cooldownPuloAzul--;
+      }
 
       if (inimigo.estado === "esperando" && distanciaAbs <= inimigo.alcanceAtaque) {
         inimigo.estado = "atacando";
@@ -2072,29 +2099,70 @@ function atualizarInimigos() {
         inimigo.ocultoNaTerra = false;
         inimigo.vy = 0;
         inimigo.direcaoOlhar = distanciaX >= 0 ? 1 : -1;
-        const obsAFrente = encontrarObstaculoAFrente(inimigo, inimigo.direcaoOlhar);
 
-        if (obsAFrente) {
-          inimigo.estado = "saltando_mergulho";
-          inimigo.obstaculoAlvo = obsAFrente;
-          inimigo.ocultoNaTerra = false;
-          inimigo.vx = inimigo.direcaoOlhar * 1.35;
-          inimigo.vy = -8.6;
-          inicializarRastroArcoPulo(inimigo);
-          inimigo.x += inimigo.vx;
-          inimigo.y += inimigo.vy;
-          registrarPontoArcoPulo(inimigo);
-        } else {
-          const passoX = inimigo.direcaoOlhar * inimigo.velocidadeAtaque;
-          const proximoX = inimigo.x + passoX;
-          if (!rastejadorAtingiriaAbismo(proximoX, inimigo.largura, inimigo.direcaoOlhar)) {
+        const estaLogoAbaixoDoSoldado = distanciaAbs <= 18 && soldado.y + soldado.alturaAtual <= inimigo.y + 8;
+        const obsAFrente = encontrarObstaculoAFrente(inimigo, inimigo.direcaoOlhar);
+        const passoX = inimigo.direcaoOlhar * inimigo.velocidadeAtaque;
+        const proximoX = inimigo.x + passoX;
+        const abismoAFrente = rastejadorAtingiriaAbismo(proximoX, inimigo.largura, inimigo.direcaoOlhar);
+
+        if (ehAzul) {
+          // Rastejador azul: pula em vez de cavar para superar obstáculos ou tentar alcançar o soldado
+          const soldadoAcima = soldado.y + soldado.alturaAtual < CHAO_Y - 22 && distanciaAbs < 165;
+          if ((obsAFrente || soldadoAcima) && inimigo.cooldownPuloAzul <= 0 && !abismoAFrente) {
+            inimigo.estado = "saltando_azul";
+            inimigo.vx = inimigo.direcaoOlhar * (inimigo.velocidadeAtaque * 1.45);
+            inimigo.vy = soldadoAcima ? -10.8 : -9.4;
+            inimigo.cooldownPuloAzul = 55;
+            inimigo.x += inimigo.vx;
+            inimigo.y += inimigo.vy;
+          } else if (estaLogoAbaixoDoSoldado || abismoAFrente) {
+            // Fica parado sem tremer quando já está sob o soldado ou na beira do abismo
+            inimigo.vx = 0;
+            inimigo.y = CHAO_Y - inimigo.altura;
+          } else {
             inimigo.vx = passoX;
             inimigo.x = proximoX;
-          } else {
-            inimigo.vx = 0;
+            inimigo.y = CHAO_Y - inimigo.altura;
           }
-          const onda = Math.sin(estadoJogo.frameAtual * 0.16 + inimigo.faseCobra);
-          inimigo.y = CHAO_Y - inimigo.altura - Math.abs(onda) * 2.5;
+        } else {
+          // Rastejador normal: cava túnel em "U" ao encontrar obstáculo; fica parado sem tremer sob o soldado ou no abismo
+          if (obsAFrente && !estaLogoAbaixoDoSoldado) {
+            inimigo.estado = "saltando_mergulho";
+            inimigo.obstaculoAlvo = obsAFrente;
+            inimigo.ocultoNaTerra = false;
+            inimigo.vx = inimigo.direcaoOlhar * 1.35;
+            inimigo.vy = -8.6;
+            inicializarRastroArcoPulo(inimigo);
+            inimigo.x += inimigo.vx;
+            inimigo.y += inimigo.vy;
+            registrarPontoArcoPulo(inimigo);
+          } else if (estaLogoAbaixoDoSoldado || abismoAFrente) {
+            inimigo.vx = 0;
+            inimigo.y = CHAO_Y - inimigo.altura;
+          } else {
+            inimigo.vx = passoX;
+            inimigo.x = proximoX;
+            inimigo.y = CHAO_Y - inimigo.altura;
+          }
+        }
+      } else if (inimigo.estado === "saltando_azul") {
+        inimigo.ocultoNaTerra = false;
+        inimigo.vy += GRAVIDADE * 0.85;
+        const proximoX = inimigo.x + inimigo.vx;
+        if (!rastejadorAtingiriaAbismo(proximoX, inimigo.largura, inimigo.direcaoOlhar)) {
+          inimigo.x = proximoX;
+        } else {
+          inimigo.vx = 0;
+        }
+        inimigo.y += inimigo.vy;
+
+        const chaoSuperficie = CHAO_Y - inimigo.altura;
+        if (inimigo.vy >= 0 && inimigo.y >= chaoSuperficie) {
+          inimigo.y = chaoSuperficie;
+          inimigo.vy = 0;
+          inimigo.vx = 0;
+          inimigo.estado = "atacando";
         }
       } else if (inimigo.estado === "saltando_mergulho") {
         inimigo.vy += GRAVIDADE * 0.85;
@@ -2212,12 +2280,12 @@ function atualizarInimigos() {
           inimigo.estado = "atacando";
         }
       } else {
+        // Parado esperando sem tremor
         inimigo.ocultoNaTerra = false;
         inimigo.vx = 0;
         inimigo.vy = 0;
         inimigo.direcaoOlhar = distanciaX >= 0 ? 1 : -1;
-        const onda = Math.sin(estadoJogo.frameAtual * 0.1 + inimigo.faseCobra);
-        inimigo.y = CHAO_Y - inimigo.altura - Math.abs(onda) * 1.5;
+        inimigo.y = CHAO_Y - inimigo.altura;
       }
     } else if (inimigo.tipo === "voador_acido") {
       const distSoldado = Math.hypot(
@@ -3138,7 +3206,6 @@ function desenharChaoComAbismosSemFundo(configNivel) {
       ctx.fillRect(cursorX, CHAO_Y, larguraSegmento, 6);
     }
 
-    // Paredes laterais escuras do abismo sem fundo
     ctx.fillStyle = "#08090d";
     ctx.fillRect(ab.x, CHAO_Y, ab.largura, alturaChao);
 
@@ -3417,7 +3484,6 @@ function desenharVoadorAcidoRealista(inimigo) {
   ctx.translate(centroX, centroY);
   ctx.scale(dir, 1);
 
-  // Asa traseira
   const asaTrasY = -batidaAsa * amplitudeAsa - 3;
   ctx.fillStyle = emDano ? "#ffd43b" : "#3a2e47";
   ctx.beginPath();
@@ -3427,7 +3493,6 @@ function desenharVoadorAcidoRealista(inimigo) {
   ctx.closePath();
   ctx.fill();
 
-  // Asa dianteira com contorno nítido e nervuras
   const asaFrenteY = batidaAsa * (amplitudeAsa + 2) - 4;
   const gradAsa = ctx.createLinearGradient(-2, -5, -26, asaFrenteY + 9);
   gradAsa.addColorStop(0, emDano ? "#ffffff" : "#6c537a");
@@ -3454,7 +3519,6 @@ function desenharVoadorAcidoRealista(inimigo) {
   ctx.lineTo(-15, asaFrenteY + 8);
   ctx.stroke();
 
-  // Corpo fuselado da criatura alada
   const gradCorpo = ctx.createRadialGradient(-2, -2, 2, 0, 1, 15);
   gradCorpo.addColorStop(0, emDano ? "#ffffff" : "#806191");
   gradCorpo.addColorStop(1, emDano ? "#ff8787" : "#2c1e33");
@@ -3467,7 +3531,6 @@ function desenharVoadorAcidoRealista(inimigo) {
   ctx.fill();
   ctx.stroke();
 
-  // Cauda pontiaguda
   ctx.fillStyle = emDano ? "#ffffff" : "#3a2842";
   ctx.beginPath();
   ctx.moveTo(13, -1);
@@ -3476,7 +3539,6 @@ function desenharVoadorAcidoRealista(inimigo) {
   ctx.closePath();
   ctx.fill();
 
-  // Cabeça com presas e olho brilhante
   ctx.fillStyle = emDano ? "#ffffff" : "#4a3354";
   ctx.beginPath();
   ctx.ellipse(-9, 1, 7.5, 6.5, 0.08, 0, Math.PI * 2);
@@ -3498,7 +3560,6 @@ function desenharVoadorAcidoRealista(inimigo) {
   ctx.closePath();
   ctx.fill();
 
-  // Gota de ácido quando está prestes a atirar (a cada 5s)
   const tempoDesdeTiro = estadoJogo.frameAtual - inimigo.ultimoAcidoFrame;
   const prestesAtirar = inimigo.ativoPatrulha && inimigo.cadenciaAcido - tempoDesdeTiro <= 35;
   if (prestesAtirar) {
@@ -3515,12 +3576,18 @@ function desenharVoadorAcidoRealista(inimigo) {
 function desenharRastejadorAlien(inimigo) {
   if (inimigo.ocultoNaTerra) return;
 
+  const ehAzul = inimigo.variante === "azul";
+  const saltandoAzul = inimigo.estado === "saltando_azul";
   const saltandoMergulho = inimigo.estado === "saltando_mergulho";
   const mergulhando = inimigo.estado === "mergulhando";
   const saindo = inimigo.estado === "saindo_terra";
   const dir = inimigo.direcaoOlhar || -1;
   const emDano = inimigo.danoFrames > 0;
-  const tremorDano = emDano ? Math.sin(estadoJogo.frameAtual * 1.4) * 3.5 : 0;
+
+  const corSegmentoPar = ehAzul ? "#339af0" : "#9c6644";
+  const corSegmentoImpar = ehAzul ? "#1c7ed6" : "#7f5539";
+  const corCabeca = ehAzul ? "#74c0fc" : "#b08968";
+  const corEspinho = ehAzul ? "#a5d8ff" : "#c8553d";
 
   ctx.save();
 
@@ -3552,24 +3619,24 @@ function desenharRastejadorAlien(inimigo) {
           ? "#ffffff"
           : "#ff6b6b"
         : s % 2 === 0
-        ? "#9c6644"
-        : "#7f5539";
+        ? corSegmentoPar
+        : corSegmentoImpar;
       ctx.beginPath();
-      ctx.arc(pt.x + tremorDano, pt.y, raio, 0, Math.PI * 2);
+      ctx.arc(pt.x, pt.y, raio, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = emDano ? "#ffd43b" : "#c8553d";
+      ctx.fillStyle = emDano ? "#ffd43b" : corEspinho;
       ctx.beginPath();
       ctx.moveTo(
-        pt.x + tremorDano + normalX * raio - Math.cos(tangenteAngulo) * 2,
+        pt.x + normalX * raio - Math.cos(tangenteAngulo) * 2,
         pt.y + normalY * raio - Math.sin(tangenteAngulo) * 2
       );
       ctx.lineTo(
-        pt.x + tremorDano + normalX * (raio + 4.5 * (1 - proporcao * 0.4)),
+        pt.x + normalX * (raio + 4.5 * (1 - proporcao * 0.4)),
         pt.y + normalY * (raio + 4.5 * (1 - proporcao * 0.4))
       );
       ctx.lineTo(
-        pt.x + tremorDano + normalX * raio + Math.cos(tangenteAngulo) * 2,
+        pt.x + normalX * raio + Math.cos(tangenteAngulo) * 2,
         pt.y + normalY * raio + Math.sin(tangenteAngulo) * 2
       );
       ctx.closePath();
@@ -3580,11 +3647,11 @@ function desenharRastejadorAlien(inimigo) {
     const anguloCabeca = Math.atan2(ptCabeca.vy, ptCabeca.vx);
 
     ctx.save();
-    ctx.translate(ptCabeca.x + tremorDano, ptCabeca.y);
+    ctx.translate(ptCabeca.x, ptCabeca.y);
     ctx.rotate(anguloCabeca);
     ctx.scale(-1, dir === 1 ? 1 : -1);
 
-    ctx.fillStyle = emDano ? "#ffffff" : "#b08968";
+    ctx.fillStyle = emDano ? "#ffffff" : corCabeca;
     ctx.beginPath();
     ctx.ellipse(0, 0, 11, 8.5, -0.15, 0, Math.PI * 2);
     ctx.fill();
@@ -3611,33 +3678,35 @@ function desenharRastejadorAlien(inimigo) {
   }
 
   const baseY = inimigo.y + inimigo.altura;
-  const freq = inimigo.estado === "atacando" ? 0.18 : 0.12;
+  const seMovendo = Math.abs(inimigo.vx) > 0.05 || saltandoAzul || saindo;
+  const freq = seMovendo ? 0.16 : 0.06;
+  const ampOnda = seMovendo ? 3.2 : 0.8;
   const tempo = estadoJogo.frameAtual * freq + inimigo.faseCobra;
 
-  const centroX = inimigo.x + inimigo.largura / 2 + tremorDano;
+  const centroX = inimigo.x + inimigo.largura / 2;
   ctx.translate(centroX, baseY);
   ctx.scale(-dir, 1);
 
-  if (saindo) {
-    const anguloSaida = Math.max(-0.85, Math.min(0.45, inimigo.vy * 0.08));
-    ctx.rotate(anguloSaida);
+  if (saltandoAzul || saindo) {
+    const anguloPulo = Math.max(-0.85, Math.min(0.45, inimigo.vy * 0.08));
+    ctx.rotate(anguloPulo);
   }
 
   const cabecaX = -14;
-  const cabecaY = -12 + Math.sin(tempo) * 2.2;
+  const cabecaY = -12 + Math.sin(tempo) * (seMovendo ? 1.8 : 0.4);
 
   const segmentos = 6;
   for (let s = segmentos; s >= 1; s--) {
     const proporcao = s / segmentos;
     const segX = cabecaX + s * 7;
-    const ondaY = Math.sin(tempo - s * 0.85) * (4 * proporcao);
+    const ondaY = Math.sin(tempo - s * 0.85) * (ampOnda * proporcao);
     const segY = -9 + ondaY;
     const raio = Math.max(3.5, 9 * (1 - proporcao * 0.55));
 
     if (emDano) {
       ctx.fillStyle = s % 2 === 0 ? "#ffffff" : "#ff6b6b";
     } else {
-      ctx.fillStyle = s % 2 === 0 ? "#9c6644" : "#7f5539";
+      ctx.fillStyle = s % 2 === 0 ? corSegmentoPar : corSegmentoImpar;
     }
     ctx.beginPath();
     ctx.arc(segX, segY, raio, 0, Math.PI * 2);
@@ -3646,7 +3715,7 @@ function desenharRastejadorAlien(inimigo) {
     ctx.fillStyle = emDano
       ? "#ffd43b"
       : inimigo.estado === "atacando"
-      ? "#c8553d"
+      ? corEspinho
       : "#ddb892";
     ctx.beginPath();
     ctx.moveTo(segX - 2, segY - raio);
@@ -3656,7 +3725,7 @@ function desenharRastejadorAlien(inimigo) {
     ctx.fill();
   }
 
-  ctx.fillStyle = emDano ? "#ffffff" : "#b08968";
+  ctx.fillStyle = emDano ? "#ffffff" : corCabeca;
   ctx.beginPath();
   ctx.ellipse(cabecaX, cabecaY, 11, 8.5, -0.15, 0, Math.PI * 2);
   ctx.fill();
@@ -3669,7 +3738,7 @@ function desenharRastejadorAlien(inimigo) {
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = emDano ? "#ff2a55" : inimigo.estado === "atacando" ? "#e03131" : "#e6a15c";
+  ctx.fillStyle = emDano ? "#ff2a55" : ehAzul ? "#fff3bf" : "#e03131";
   ctx.beginPath();
   ctx.arc(cabecaX - 2, cabecaY - 3, 3.2, 0, Math.PI * 2);
   ctx.fill();
@@ -3958,10 +4027,14 @@ function desenharCena() {
     ctx.fillRect(boss.x + tremorBoss - 16, boss.y + boss.altura - 26, 20, 12);
   }
 
-  ctx.fillStyle = "#ffe066";
   for (let i = 0; i < estadoJogo.tirosJogador.length; i++) {
     const t = estadoJogo.tirosJogador[i];
-    ctx.fillRect(t.x, t.y, t.largura, t.altura);
+    ctx.save();
+    ctx.translate(t.x + t.largura / 2, t.y + t.altura / 2);
+    ctx.rotate(t.angulo || 0);
+    ctx.fillStyle = "#ffe066";
+    ctx.fillRect(-7, -3, 14, 6);
+    ctx.restore();
   }
 
   for (let i = 0; i < estadoJogo.tirosInimigos.length; i++) {
