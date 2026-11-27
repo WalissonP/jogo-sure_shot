@@ -1023,8 +1023,13 @@ function configurarMapaFase2Caverna(distanciaMeta) {
     });
   }
 
+  // Apenas plataformas pontuais: a que desaba no abismo grande e uma suspensa no meio da caverna
+  const abismosComPlataforma = [1360, 1840];
+
   for (let i = 0; i < abismos.length; i++) {
     const ab = abismos[i];
+    if (!abismosComPlataforma.includes(ab.x)) continue;
+
     const ehBuracoGrande = ab.largura >= 160;
 
     if (ehBuracoGrande) {
@@ -1077,34 +1082,33 @@ function posicionarRastejadoresMapa() {
 
 function posicionarRastejadoresFase2() {
   const pontosFase2 = [
-    { x: 450, alcance: 230, velocidadeAtaque: 1.5, variante: "normal" },
-    { x: 650, alcance: 235, velocidadeAtaque: 1.55, variante: "azul" },
-    { x: 960, alcance: 235, velocidadeAtaque: 1.6, variante: "normal" },
-    { x: 1200, alcance: 240, velocidadeAtaque: 1.65, variante: "azul" },
-    { x: 1625, alcance: 240, velocidadeAtaque: 1.7, variante: "normal" },
-    { x: 1960, alcance: 245, velocidadeAtaque: 1.7, variante: "azul" },
-    { x: 2210, alcance: 245, velocidadeAtaque: 1.75, variante: "normal" },
-    { x: 2460, alcance: 250, velocidadeAtaque: 1.8, variante: "azul" },
-    { x: 2680, alcance: 250, velocidadeAtaque: 1.85, variante: "normal" },
-    { x: 3045, alcance: 255, velocidadeAtaque: 1.9, variante: "azul" }
+    // Trecho 1: guarda o solo e a rocha elevada após o 1º abismo
+    { x: 730, alcance: 240, velocidadeAtaque: 1.55, variante: "normal", yBase: CHAO_Y },
+    { x: 850, alcance: 250, velocidadeAtaque: 1.6, variante: "azul", yBase: CHAO_Y - 66 },
+
+    // Trecho 2: meio da caverna, após o grande abismo
+    { x: 1865, alcance: 255, velocidadeAtaque: 1.7, variante: "azul", yBase: CHAO_Y - 108 },
+    { x: 1995, alcance: 250, velocidadeAtaque: 1.75, variante: "normal", yBase: CHAO_Y },
+
+    // Trecho 3: reta final antes da saída da caverna
+    { x: 2565, alcance: 260, velocidadeAtaque: 1.8, variante: "azul", yBase: CHAO_Y - 54 },
+    { x: 3042, alcance: 265, velocidadeAtaque: 1.85, variante: "normal", yBase: CHAO_Y }
   ];
 
   for (let i = 0; i < pontosFase2.length; i++) {
     const p = pontosFase2[i];
     estadoJogo.inimigos.push(
-      criarRastejador(p.x, p.alcance, p.velocidadeAtaque, i + 10, p.variante)
+      criarRastejador(p.x, p.alcance, p.velocidadeAtaque, i + 10, p.variante, p.yBase)
     );
   }
 }
 
 function posicionarVoadoresFase2() {
   const locaisVoadores = [
-    { x: 560, y: 155, raioDeteccao: 270, amplitudePatrulha: 115, offsetTiro: 0 },
-    { x: 1020, y: 140, raioDeteccao: 275, amplitudePatrulha: 125, offsetTiro: 80 },
-    { x: 1520, y: 165, raioDeteccao: 275, amplitudePatrulha: 125, offsetTiro: 160 },
-    { x: 2020, y: 142, raioDeteccao: 280, amplitudePatrulha: 130, offsetTiro: 240 },
-    { x: 2520, y: 158, raioDeteccao: 280, amplitudePatrulha: 130, offsetTiro: 60 },
-    { x: 2940, y: 138, raioDeteccao: 285, amplitudePatrulha: 120, offsetTiro: 140 }
+    // Apenas 3 patrulhas aéreas espaçadas ao longo da caverna
+    { x: 1105, y: 145, raioDeteccao: 280, amplitudePatrulha: 95, offsetTiro: 40 },
+    { x: 2100, y: 138, raioDeteccao: 290, amplitudePatrulha: 100, offsetTiro: 120 },
+    { x: 2840, y: 140, raioDeteccao: 295, amplitudePatrulha: 95, offsetTiro: 190 }
   ];
 
   for (let i = 0; i < locaisVoadores.length; i++) {
@@ -1120,14 +1124,15 @@ function criarRastejador(
   alcance = 240,
   velocidadeAtaque = 1.5,
   indice = 0,
-  variante = "normal"
+  variante = "normal",
+  yBase = CHAO_Y
 ) {
   const ehAzul = variante === "azul";
   return {
     tipo: "rastejador",
     variante: ehAzul ? "azul" : "normal",
     x: x,
-    y: CHAO_Y - 26,
+    y: yBase - 26,
     largura: 52,
     altura: 26,
     vx: 0,
@@ -1888,11 +1893,11 @@ function gerarInimigos() {
 }
 
 function encontrarObstaculoAFrente(inimigo, dir) {
-  const proximoX = dir === 1 ? inimigo.x + inimigo.largura + 16 : inimigo.x - 30;
+  const proximoX = dir === 1 ? inimigo.x + inimigo.largura + 14 : inimigo.x - 28;
   const caixaFrente = {
     x: proximoX,
-    y: CHAO_Y - 26,
-    largura: 30,
+    y: inimigo.y + inimigo.altura - 26,
+    largura: 28,
     altura: 26
   };
 
@@ -1901,6 +1906,65 @@ function encontrarObstaculoAFrente(inimigo, dir) {
       return estadoJogo.obstaculos[i];
     }
   }
+  return null;
+}
+
+function obterSuperficieApoioRastejador(inimigo, yAnterior, apenasApoioAtual = false) {
+  const baseAtual = inimigo.y + inimigo.altura;
+  const baseAnterior = yAnterior + inimigo.altura;
+  const margemX = 6;
+
+  // 1. Plataformas suspensas
+  for (let i = 0; i < estadoJogo.plataformas.length; i++) {
+    const plat = estadoJogo.plataformas[i];
+    if (plat.desmoronando) continue;
+
+    const sobreX =
+      inimigo.x + inimigo.largura - margemX > plat.x &&
+      inimigo.x + margemX < plat.x + plat.largura;
+
+    if (!sobreX) continue;
+
+    if (apenasApoioAtual) {
+      if (Math.abs(baseAtual - plat.y) <= 4) {
+        return { y: plat.y, tipo: "plataforma", alvo: plat };
+      }
+    } else if (inimigo.vy >= 0 && baseAnterior <= plat.y + 8 && baseAtual >= plat.y) {
+      return { y: plat.y, tipo: "plataforma", alvo: plat };
+    }
+  }
+
+  // 2. Rochas elevadas e obstáculos sólidos
+  for (let i = 0; i < estadoJogo.obstaculos.length; i++) {
+    const obs = estadoJogo.obstaculos[i];
+    const sobreX =
+      inimigo.x + inimigo.largura - margemX > obs.x &&
+      inimigo.x + margemX < obs.x + obs.largura;
+
+    if (!sobreX) continue;
+
+    if (apenasApoioAtual) {
+      if (Math.abs(baseAtual - obs.y) <= 4) {
+        return { y: obs.y, tipo: "obstaculo", alvo: obs };
+      }
+    } else if (inimigo.vy >= 0 && baseAnterior <= obs.y + 10 && baseAtual >= obs.y) {
+      return { y: obs.y, tipo: "obstaculo", alvo: obs };
+    }
+  }
+
+  // 3. Chão principal (fora de abismos)
+  const peX = inimigo.x + inimigo.largura / 2;
+  const sobreAbismo = encontrarAbismoSobrePe(peX);
+  if (!sobreAbismo) {
+    if (apenasApoioAtual) {
+      if (Math.abs(baseAtual - CHAO_Y) <= 4) {
+        return { y: CHAO_Y, tipo: "chao", alvo: null };
+      }
+    } else if (inimigo.vy >= 0 && baseAtual >= CHAO_Y) {
+      return { y: CHAO_Y, tipo: "chao", alvo: null };
+    }
+  }
+
   return null;
 }
 
@@ -2095,6 +2159,7 @@ function cuspirAcidoEmDirecaoAoSoldado(voador) {
 }
 
 function atualizarInimigos() {
+  const configNivel = NIVEIS[estadoJogo.nivelIndice];
   const centroSoldadoX = soldado.x + soldado.largura / 2;
   const centroSoldadoY = soldado.y + soldado.alturaAtual / 2;
 
@@ -2109,6 +2174,7 @@ function atualizarInimigos() {
       const distanciaX = centroSoldadoX - centroInimigoX;
       const distanciaAbs = Math.abs(distanciaX);
       const ehAzul = inimigo.variante === "azul";
+      const yAnteriorInimigo = inimigo.y;
 
       if (inimigo.cooldownPuloAzul > 0) {
         inimigo.cooldownPuloAzul--;
@@ -2120,52 +2186,92 @@ function atualizarInimigos() {
 
       if (inimigo.estado === "atacando") {
         inimigo.ocultoNaTerra = false;
-        inimigo.vy = 0;
         inimigo.direcaoOlhar = distanciaX >= 0 ? 1 : -1;
 
-        const estaLogoAbaixoDoSoldado = distanciaAbs <= 18 && soldado.y + soldado.alturaAtual <= inimigo.y + 8;
+        const apoioAtual = obterSuperficieApoioRastejador(inimigo, yAnteriorInimigo, true);
+        const noChaoPrincipal = apoioAtual && apoioAtual.tipo === "chao";
+
+        if (apoioAtual) {
+          inimigo.y = apoioAtual.y - inimigo.altura;
+          inimigo.vy = 0;
+        } else {
+          // Caindo suavemente caso saia da borda de uma rocha ou plataforma
+          inimigo.vy += GRAVIDADE * 0.85;
+          inimigo.y += inimigo.vy;
+          const pouso = obterSuperficieApoioRastejador(inimigo, yAnteriorInimigo, false);
+          if (pouso) {
+            inimigo.y = pouso.y - inimigo.altura;
+            inimigo.vy = 0;
+          } else if (inimigo.y > canvas.height + 30) {
+            estadoJogo.inimigos.splice(i, 1);
+            continue;
+          }
+        }
+
+        const estaLogoAbaixoDoSoldado =
+          distanciaAbs <= 18 && soldado.y + soldado.alturaAtual <= inimigo.y + 8;
         const obsAFrente = encontrarObstaculoAFrente(inimigo, inimigo.direcaoOlhar);
         const passoX = inimigo.direcaoOlhar * inimigo.velocidadeAtaque;
         const proximoX = inimigo.x + passoX;
 
         if (ehAzul) {
-          // Rastejador azul: igual ao bege/marrom, mas em vez de cavar, pula obstáculos e buracos pequenos (<= 115px)
-          const infoAbismo = rastejadorAtingiriaAbismo(
-            proximoX,
-            inimigo.largura,
-            inimigo.direcaoOlhar,
-            115
+          // Se estiver em plataforma suspensa sobre abismo, permanece na plataforma sem cair no vazio
+          let bloqueadoPorBordaPlataforma = false;
+          if (apoioAtual && apoioAtual.tipo === "plataforma") {
+            const plat = apoioAtual.alvo;
+            const proximoCentroX = proximoX + inimigo.largura / 2;
+            const saiuDaPlataforma =
+              proximoCentroX <= plat.x + 8 || proximoCentroX >= plat.x + plat.largura - 8;
+            if (saiuDaPlataforma && encontrarAbismoSobrePe(proximoCentroX)) {
+              bloqueadoPorBordaPlataforma = true;
+            }
+          }
+
+          const infoAbismo = noChaoPrincipal
+            ? rastejadorAtingiriaAbismo(proximoX, inimigo.largura, inimigo.direcaoOlhar, 115)
+            : { atingiria: false, pulavel: false, abismo: null };
+
+          const devePularObstaculo = Boolean(apoioAtual && obsAFrente && !estaLogoAbaixoDoSoldado);
+          const devePularBuracoPequeno = Boolean(
+            apoioAtual && infoAbismo.atingiria && infoAbismo.pulavel
           );
-          const devePularObstaculo = Boolean(obsAFrente && !estaLogoAbaixoDoSoldado);
-          const devePularBuracoPequeno = Boolean(infoAbismo.atingiria && infoAbismo.pulavel);
 
           if (
             inimigo.cooldownPuloAzul <= 0 &&
             (devePularObstaculo || devePularBuracoPequeno)
           ) {
             inimigo.estado = "saltando_azul";
-            inimigo.vx = inimigo.direcaoOlhar * Math.max(3.8, inimigo.velocidadeAtaque * 2.1);
-            inimigo.vy = -11.6;
+            inimigo.vx = inimigo.direcaoOlhar * Math.max(3.8, inimigo.velocidadeAtaque * 2.15);
+
+            // Pulo baixo e calculado apenas para vencer a altura do obstáculo ou buraco
+            if (devePularObstaculo && obsAFrente) {
+              const gRastejador = GRAVIDADE * 0.85;
+              const impulsoCalculado = Math.sqrt(2 * gRastejador * (obsAFrente.altura + 8));
+              inimigo.vy = -Math.min(9.1, Math.max(7.4, impulsoCalculado));
+            } else {
+              inimigo.vy = -7.5;
+            }
+
             inimigo.cooldownPuloAzul = 38;
             inimigo.x += inimigo.vx;
             inimigo.y += inimigo.vy;
-          } else if (estaLogoAbaixoDoSoldado || infoAbismo.atingiria) {
+          } else if (
+            estaLogoAbaixoDoSoldado ||
+            infoAbismo.atingiria ||
+            bloqueadoPorBordaPlataforma
+          ) {
             inimigo.vx = 0;
-            inimigo.y = CHAO_Y - inimigo.altura;
           } else {
             inimigo.vx = passoX;
             inimigo.x = proximoX;
-            inimigo.y = CHAO_Y - inimigo.altura;
           }
         } else {
-          // Rastejador bege/marrom: cava túnel em "U" ao encontrar obstáculo; para na borda do buraco ou sob o soldado
-          const infoAbismo = rastejadorAtingiriaAbismo(
-            proximoX,
-            inimigo.largura,
-            inimigo.direcaoOlhar,
-            0
-          );
-          if (obsAFrente && !estaLogoAbaixoDoSoldado) {
+          // Rastejador marrom: cava túnel em "U" ao encontrar obstáculo
+          const infoAbismo = noChaoPrincipal
+            ? rastejadorAtingiriaAbismo(proximoX, inimigo.largura, inimigo.direcaoOlhar, 0)
+            : { atingiria: false, pulavel: false, abismo: null };
+
+          if (noChaoPrincipal && obsAFrente && !estaLogoAbaixoDoSoldado) {
             inimigo.estado = "saltando_mergulho";
             inimigo.obstaculoAlvo = obsAFrente;
             inimigo.ocultoNaTerra = false;
@@ -2177,11 +2283,9 @@ function atualizarInimigos() {
             registrarPontoArcoPulo(inimigo);
           } else if (estaLogoAbaixoDoSoldado || infoAbismo.atingiria) {
             inimigo.vx = 0;
-            inimigo.y = CHAO_Y - inimigo.altura;
           } else {
             inimigo.vx = passoX;
             inimigo.x = proximoX;
-            inimigo.y = CHAO_Y - inimigo.altura;
           }
         }
       } else if (inimigo.estado === "saltando_azul") {
@@ -2190,12 +2294,9 @@ function atualizarInimigos() {
         inimigo.x += inimigo.vx;
         inimigo.y += inimigo.vy;
 
-        const chaoSuperficie = CHAO_Y - inimigo.altura;
-        const peRastejadorX = inimigo.x + inimigo.largura / 2;
-        const sobreAbismo = encontrarAbismoSobrePe(peRastejadorX);
-
-        if (!sobreAbismo && inimigo.vy >= 0 && inimigo.y >= chaoSuperficie) {
-          inimigo.y = chaoSuperficie;
+        const pouso = obterSuperficieApoioRastejador(inimigo, yAnteriorInimigo, false);
+        if (pouso) {
+          inimigo.y = pouso.y - inimigo.altura;
           inimigo.vy = 0;
           inimigo.vx = 0;
           inimigo.estado = "atacando";
@@ -2275,12 +2376,7 @@ function atualizarInimigos() {
             caminho.ativo = false;
             const xSaida = caminho.xSaida;
             inimigo.x = xSaida - inimigo.largura / 2;
-            criarBuracoNoSolo(
-              xSaida - 14,
-              28,
-              true,
-              140
-            );
+            criarBuracoNoSolo(xSaida - 14, 28, true, 140);
 
             inimigo.ocultoNaTerra = false;
             inimigo.estado = "saindo_terra";
@@ -2312,19 +2408,22 @@ function atualizarInimigos() {
         inimigo.vy += GRAVIDADE * 0.85;
         inimigo.y += inimigo.vy;
 
-        const chaoSuperficie = CHAO_Y - inimigo.altura;
-        if (inimigo.vy >= 0 && inimigo.y >= chaoSuperficie) {
-          inimigo.y = chaoSuperficie;
+        const pouso = obterSuperficieApoioRastejador(inimigo, yAnteriorInimigo, false);
+        if (pouso) {
+          inimigo.y = pouso.y - inimigo.altura;
           inimigo.vy = 0;
           inimigo.estado = "atacando";
         }
       } else {
-        // Parado esperando sem tremor
+        // Parado esperando em cima da plataforma, rocha ou chão
         inimigo.ocultoNaTerra = false;
         inimigo.vx = 0;
         inimigo.vy = 0;
         inimigo.direcaoOlhar = distanciaX >= 0 ? 1 : -1;
-        inimigo.y = CHAO_Y - inimigo.altura;
+        const apoioEspera = obterSuperficieApoioRastejador(inimigo, yAnteriorInimigo, true);
+        if (apoioEspera) {
+          inimigo.y = apoioEspera.y - inimigo.altura;
+        }
       }
     } else if (inimigo.tipo === "voador_acido") {
       const distSoldado = Math.hypot(
@@ -2374,9 +2473,10 @@ function atualizarInimigos() {
       aplicarDanoSoldado(15, direcaoImpacto);
     }
 
-    const foraEsquerda = inimigo.x + inimigo.largura < estadoJogo.cameraX - 160;
-    const foraDireita = inimigo.x > estadoJogo.cameraX + canvas.width + 160;
-    if (foraEsquerda || foraDireita) {
+    // Só remove inimigos que já ficaram para trás da câmera ou saíram do limite final da fase
+    const foraEsquerda = inimigo.x + inimigo.largura < estadoJogo.cameraX - 180;
+    const foraLimiteMapa = inimigo.x > configNivel.distanciaMeta + 240;
+    if (foraEsquerda || foraLimiteMapa) {
       estadoJogo.inimigos.splice(i, 1);
     }
   }
@@ -2510,10 +2610,6 @@ function atualizarProjeteis() {
       if (inimigo.ocultoNaTerra || inimigo.estado === "mergulhando") continue;
 
       if (colidiu(tiro, inimigo)) {
-        if (inimigo.tipo === "rastejador" && tiro.nivelTiro !== "baixo") {
-          continue;
-        }
-
         const danoBala = tiro.dano !== undefined ? tiro.dano : 1;
         inimigo.vida = Math.max(0, inimigo.vida - danoBala);
         inimigo.mostrarBarraVida = true;
@@ -3301,16 +3397,127 @@ function desenharEstruturasQuebradas() {
   }
 }
 
+function desenharTetoCaverna(configNivel) {
+  const limiteMundo = configNivel.distanciaMeta + 300;
+
+  // 1. Camada profunda da abóbada rochosa (parallax mais lento para dar profundidade)
+  ctx.save();
+  ctx.translate(-estadoJogo.cameraX * 0.4, 0);
+  ctx.fillStyle = "#0e121b";
+  ctx.beginPath();
+  ctx.moveTo(-40, 0);
+  for (let rx = -40; rx <= limiteMundo; rx += 130) {
+    const alturaArco = 42 + ((Math.abs(rx) * 19) % 24);
+    ctx.lineTo(rx + 45, alturaArco);
+    ctx.lineTo(rx + 95, alturaArco - 12);
+    ctx.lineTo(rx + 130, alturaArco + 4);
+  }
+  ctx.lineTo(limiteMundo, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // 2. Camada principal do teto de rocha e estalactites presas diretamente na pedra
+  ctx.save();
+  ctx.translate(-estadoJogo.cameraX * 0.65, 0);
+
+  const passoRocha = 95;
+  const pontosContorno = [];
+  for (let sx = -55; sx <= limiteMundo; sx += passoRocha) {
+    const baseTeto = 24 + ((Math.abs(sx) * 17) % 18);
+    pontosContorno.push({ x: sx, y: baseTeto });
+    pontosContorno.push({ x: sx + 32, y: baseTeto + 11 });
+    pontosContorno.push({ x: sx + 64, y: baseTeto - 4 });
+  }
+
+  // Massa principal de rocha do teto
+  ctx.fillStyle = "#191e2b";
+  ctx.beginPath();
+  ctx.moveTo(pontosContorno[0].x, 0);
+  for (let i = 0; i < pontosContorno.length; i++) {
+    ctx.lineTo(pontosContorno[i].x, pontosContorno[i].y);
+  }
+  ctx.lineTo(pontosContorno[pontosContorno.length - 1].x, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // Facetas internas de pedra para textura rochosa
+  for (let i = 0; i < pontosContorno.length - 2; i += 2) {
+    const p1 = pontosContorno[i];
+    const p2 = pontosContorno[i + 1];
+    const p3 = pontosContorno[i + 2];
+
+    ctx.fillStyle = i % 4 === 0 ? "#242b3d" : "#1f2534";
+    ctx.beginPath();
+    ctx.moveTo(p1.x, 0);
+    ctx.lineTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.lineTo(p3.x, p3.y - 6);
+    ctx.lineTo(p3.x, 0);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Estalactites partindo da borda inferior do teto rochoso
+  for (let sx = 40; sx < limiteMundo; sx += passoRocha) {
+    const baseTeto = 24 + ((Math.abs(sx) * 17) % 18);
+    const comp = 22 + ((sx * 13) % 28);
+
+    ctx.fillStyle = "#161a24";
+    ctx.beginPath();
+    ctx.moveTo(sx - 18, baseTeto - 3);
+    ctx.lineTo(sx + 18, baseTeto - 3);
+    ctx.lineTo(sx + 2, baseTeto + comp);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#283044";
+    ctx.beginPath();
+    ctx.moveTo(sx - 12, baseTeto - 3);
+    ctx.lineTo(sx + 2, baseTeto - 3);
+    ctx.lineTo(sx + 2, baseTeto + comp - 4);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Borda inferior iluminada da rocha do teto
+  ctx.strokeStyle = "#343e56";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < pontosContorno.length; i++) {
+    const pt = pontosContorno[i];
+    if (i === 0) ctx.moveTo(pt.x, pt.y);
+    else ctx.lineTo(pt.x, pt.y);
+  }
+  ctx.stroke();
+
+  ctx.restore();
+}
+
 function desenharCenarioCaverna(configNivel) {
   const gradCeu = ctx.createLinearGradient(0, 0, 0, CHAO_Y);
-  gradCeu.addColorStop(0, "#0b0e14");
-  gradCeu.addColorStop(0.55, "#191f2c");
-  gradCeu.addColorStop(1, "#2a2430");
+  gradCeu.addColorStop(0, "#090c12");
+  gradCeu.addColorStop(0.5, "#151b27");
+  gradCeu.addColorStop(1, "#26212d");
   ctx.fillStyle = gradCeu;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  // Pilares rochosos de fundo e cristais distantes conectando teto e chão
   ctx.save();
   ctx.translate(-estadoJogo.cameraX * 0.25, 0);
+  for (let px = 190; px < configNivel.distanciaMeta; px += 460) {
+    ctx.fillStyle = "rgba(15, 19, 29, 0.65)";
+    ctx.beginPath();
+    ctx.moveTo(px - 28, 25);
+    ctx.lineTo(px + 28, 25);
+    ctx.lineTo(px + 18, CHAO_Y * 0.52);
+    ctx.lineTo(px + 34, CHAO_Y);
+    ctx.lineTo(px - 34, CHAO_Y);
+    ctx.lineTo(px - 18, CHAO_Y * 0.52);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   for (let cx = 140; cx < configNivel.distanciaMeta; cx += 340) {
     ctx.fillStyle = "rgba(56, 189, 248, 0.08)";
     ctx.beginPath();
@@ -3322,27 +3529,8 @@ function desenharCenarioCaverna(configNivel) {
   }
   ctx.restore();
 
-  ctx.save();
-  ctx.translate(-estadoJogo.cameraX * 0.65, 0);
-  for (let sx = 40; sx < configNivel.distanciaMeta + 200; sx += 95) {
-    const comp = 26 + ((sx * 13) % 36);
-    ctx.fillStyle = "#161922";
-    ctx.beginPath();
-    ctx.moveTo(sx - 18, 0);
-    ctx.lineTo(sx + 18, 0);
-    ctx.lineTo(sx + 2, comp);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.fillStyle = "#252b3b";
-    ctx.beginPath();
-    ctx.moveTo(sx - 12, 0);
-    ctx.lineTo(sx + 2, 0);
-    ctx.lineTo(sx + 2, comp - 4);
-    ctx.closePath();
-    ctx.fill();
-  }
-  ctx.restore();
+  // Teto de rocha e estalactites
+  desenharTetoCaverna(configNivel);
 
   ctx.save();
   ctx.translate(-estadoJogo.cameraX, 0);
