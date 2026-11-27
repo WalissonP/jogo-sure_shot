@@ -8,7 +8,6 @@
 </head>
 <body>
   <div id="app-tela-cheia" class="app-tela-cheia">
-    <!-- Palco principal em tela cheia sem barra superior -->
     <main id="palco-wrapper" class="palco-wrapper">
       <canvas id="tela-jogo" width="900" height="440"></canvas>
 
@@ -37,6 +36,7 @@
         <div id="painel-menu-opcoes" class="painel-menu">
           <p class="etiqueta-sistema">MENU PRINCIPAL</p>
           <h2>OPERAÇÃO VANGUARDA</h2>
+          <p class="recorde-badge">Recorde Atual: <strong id="menu-recorde">0</strong> pts</p>
 
           <nav class="menu-botoes" aria-label="Menu principal">
             <button id="btn-menu-campanha" type="button" class="btn-primario btn-menu">Campanha</button>
@@ -53,11 +53,11 @@
             <li><strong>Lobby</strong>: <strong>A/D</strong> ou <strong>←/→</strong> andar • <strong>Enter/Espaço</strong> entrar</li>
             <li><strong>Andar</strong>: <strong>A / D</strong> ou <strong>← / →</strong></li>
             <li><strong>Mirar para cima</strong>: <strong>W</strong> ou <strong>↑</strong> (segurar)</li>
-            <li><strong>Agachar</strong>: <strong>S</strong> ou <strong>↓</strong> (segurar)</li>
+            <li><strong>Agachar / Descer</strong>: <strong>S</strong> ou <strong>↓</strong> (+ <strong>Espaço</strong> na plataforma)</li>
             <li><strong>Mirar parado (8 direções)</strong>: Segurar <strong>K</strong> ou <strong>X</strong> + <strong>WASD / Setas</strong></li>
             <li><strong>Pular</strong>: <strong>Espaço</strong></li>
             <li><strong>Atirar</strong>: <strong>J</strong> ou <strong>Z</strong></li>
-            <li><strong>Música (Lobby+) / Reiniciar / Menu</strong>: <strong>M</strong> / <strong>R</strong> / <strong>Esc</strong></li>
+            <li><strong>Música / Reiniciar / Pausar</strong>: <strong>M</strong> / <strong>R</strong> / <strong>Esc</strong></li>
           </ul>
           <button id="btn-voltar-menu-controles" type="button" class="btn-primario">Voltar ao Menu</button>
         </div>
@@ -67,8 +67,12 @@
           <h3>Opções</h3>
           <div class="opcoes-lista">
             <div class="opcao-linha">
-              <span>Música (apenas trilha)</span>
+              <span>Trilha Sonora (Música)</span>
               <button id="btn-opcao-musica" type="button" class="btn-secundario">🎵 Música: ON</button>
+            </div>
+            <div class="opcao-linha">
+              <span>Efeitos Sonoros (SFX)</span>
+              <button id="btn-opcao-sfx" type="button" class="btn-secundario">🔊 Efeitos: ON</button>
             </div>
             <div class="opcao-linha">
               <span>Modo Tela Cheia</span>
@@ -76,7 +80,7 @@
             </div>
             <div class="opcao-linha">
               <span>Progresso das Fases</span>
-              <button id="btn-reset-progresso" type="button" class="btn-secundario">Resetar Fases</button>
+              <button id="btn-reset-progresso" type="button" class="btn-secundario">Resetar Save</button>
             </div>
           </div>
           <button id="btn-voltar-menu-opcoes" type="button" class="btn-primario">Voltar ao Menu</button>
@@ -95,17 +99,19 @@
         </div>
       </div>
 
-      <!-- 3. Menu de pause durante a partida -->
+      <!-- 3. Menu de pause completo durante a partida -->
       <div id="overlay-pause" class="overlay oculto">
         <div id="painel-pause-menu" class="painel-menu">
-          <p class="etiqueta-sistema">JOGO PAUSADO</p>
+          <p class="etiqueta-sistema" id="pause-setor-info">JOGO PAUSADO</p>
           <h2>PAUSA</h2>
 
           <div class="menu-botoes">
             <button id="btn-pause-continuar" type="button" class="btn-primario btn-menu">Continuar</button>
+            <button id="btn-pause-reiniciar" type="button" class="btn-secundario btn-menu">Reiniciar Fase</button>
             <button id="btn-pause-controles" type="button" class="btn-secundario btn-menu">Controles</button>
             <button id="btn-pause-opcoes" type="button" class="btn-secundario btn-menu">Opções</button>
-            <button id="btn-pause-lobby" type="button" class="btn-secundario btn-menu btn-sair">Voltar ao Lobby</button>
+            <button id="btn-pause-lobby" type="button" class="btn-secundario btn-menu">Voltar ao Lobby</button>
+            <button id="btn-pause-menu-principal" type="button" class="btn-secundario btn-menu btn-sair">Menu Principal</button>
           </div>
         </div>
 
@@ -116,7 +122,7 @@
             <li><strong>Lobby</strong>: <strong>A/D</strong> ou <strong>←/→</strong> andar • <strong>Enter/Espaço</strong> entrar</li>
             <li><strong>Andar</strong>: <strong>A / D</strong> ou <strong>← / →</strong></li>
             <li><strong>Mirar para cima</strong>: <strong>W</strong> ou <strong>↑</strong> (segurar)</li>
-            <li><strong>Agachar</strong>: <strong>S</strong> ou <strong>↓</strong> (segurar)</li>
+            <li><strong>Agachar / Descer</strong>: <strong>S</strong> ou <strong>↓</strong> (+ <strong>Espaço</strong> na plataforma)</li>
             <li><strong>Mirar parado (8 direções)</strong>: Segurar <strong>K</strong> ou <strong>X</strong> + <strong>WASD / Setas</strong></li>
             <li><strong>Pular</strong>: <strong>Espaço</strong></li>
             <li><strong>Atirar</strong>: <strong>J</strong> ou <strong>Z</strong></li>
@@ -130,8 +136,12 @@
           <h3>Opções</h3>
           <div class="opcoes-lista">
             <div class="opcao-linha">
-              <span>Música (apenas trilha)</span>
+              <span>Trilha Sonora (Música)</span>
               <button id="btn-pause-opcao-musica" type="button" class="btn-secundario">🎵 Música: ON</button>
+            </div>
+            <div class="opcao-linha">
+              <span>Efeitos Sonoros (SFX)</span>
+              <button id="btn-pause-opcao-sfx" type="button" class="btn-secundario">🔊 Efeitos: ON</button>
             </div>
             <div class="opcao-linha">
               <span>Modo Tela Cheia</span>
@@ -142,7 +152,7 @@
         </div>
       </div>
 
-      <!-- Barra de atalhos do lobby (inclui mutar apenas a música) -->
+      <!-- Barra de atalhos do lobby -->
       <div id="barra-lobby" class="barra-lobby oculto">
         <span id="status-lobby-texto">Lobby: ande até a fase e aperte Enter ou Espaço</span>
         <div class="acoes-lobby">
@@ -151,15 +161,54 @@
         </div>
       </div>
 
-      <!-- Tela de fim de partida -->
+      <!-- 4. Tela de Derrota -->
       <div id="overlay-fim" class="overlay oculto">
         <div class="painel-menu">
+          <p class="etiqueta-sistema">FIM DE COMBATE</p>
           <h2 id="titulo-fim">Fim de Jogo</h2>
           <p id="mensagem-fim">Você foi derrotado em combate.</p>
           <p class="placar-final">Pontuação Final: <strong id="pontuacao-final">0</strong></p>
+          <p class="recorde-badge">Recorde: <strong id="fim-recorde">0</strong> pts</p>
           <div class="acoes-fim">
             <button id="btn-reiniciar" type="button" class="btn-primario">Jogar Novamente</button>
             <button id="btn-voltar-lobby" type="button" class="btn-secundario">Voltar ao Lobby</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Tela Final de Campanha Zerada (Vitória após matar o Boss) -->
+      <div id="overlay-zerado" class="overlay oculto">
+        <div class="painel-menu painel-zerado">
+          <p class="etiqueta-sistema etiqueta-vitoria">OPERAÇÃO CONCLUÍDA • 100% LIBERTADO</p>
+          <h2>VITÓRIA DA VANGUARDA!</h2>
+          <p class="texto-historia-final">
+            O Comandante Extraterrestre foi neutralizado no Núcleo e a invasão foi contida.
+            Todos os setores estão seguros novamente graças à sua atuação em campo.
+          </p>
+
+          <div class="resumo-zerado">
+            <div class="resumo-linha">
+              <span>Pontuação Total</span>
+              <strong id="zerado-pontuacao">0</strong>
+            </div>
+            <div class="resumo-linha">
+              <span>Recorde Histórico</span>
+              <strong id="zerado-recorde">0</strong>
+            </div>
+            <div class="resumo-linha">
+              <span>Patente Alcançada</span>
+              <strong id="zerado-patente" class="patente-destaque">COMANDANTE SUPREMO</strong>
+            </div>
+          </div>
+
+          <p class="creditos-final">
+            Desenvolvido por <strong>Walisson Pastori</strong> • HTML5 Canvas &amp; Web Audio API
+          </p>
+
+          <div class="acoes-fim">
+            <button id="btn-zerado-novo-jogo" type="button" class="btn-primario">Jogar Nova Campanha</button>
+            <button id="btn-zerado-lobby" type="button" class="btn-secundario">Explorar Lobby</button>
+            <button id="btn-zerado-menu" type="button" class="btn-secundario">Menu Principal</button>
           </div>
         </div>
       </div>
