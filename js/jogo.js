@@ -1251,9 +1251,11 @@ function criarVoadorAcido(x, yBase, raioDeteccao = 280, amplitudePatrulha = 125,
 }
 
 function criarBoss() {
-  // Ajusta a plataforma da direita um pouco para a esquerda para não colidir com o corpo gigante do boss
+  // Centraliza um pouco as duas plataformas para o Boss ter espaço livre nos dois lados do mapa
   for (let i = 0; i < estadoJogo.plataformas.length; i++) {
-    if (estadoJogo.plataformas[i].x === 600) {
+    if (estadoJogo.plataformas[i].x === 140) {
+      estadoJogo.plataformas[i].x = 250;
+    } else if (estadoJogo.plataformas[i].x === 600) {
       estadoJogo.plataformas[i].x = 490;
     }
   }
@@ -1268,10 +1270,17 @@ function criarBoss() {
     vida: 60,
     vidaMaxima: 60,
     danoFrames: 0,
-    estado: "parado", // "parado" | "rindo" | "olhando_cima" | "socando_chao"
+    lado: "direita", // "direita" | "esquerda"
+    direcaoOlhar: -1, // -1 olhando para esquerda, 1 olhando para direita
+    estado: "parado", // "parado" | "rindo" | "olhando_cima" | "socando_chao" | "agachando" | "pulando_lado"
     timerEstado: 80,
     frameAcao: 0,
     indiceCicloAtaque: 0,
+    acoesDesdeUltimoPulo: 0,
+    xOrigemPulo: 715,
+    xDestinoPulo: 715,
+    escalaX: 1,
+    escalaY: 1,
     invocouNaAcao: false,
     tremorChaoFrames: 0,
     risadasFlutuantes: []
@@ -2530,7 +2539,7 @@ function atualizarInimigos() {
         }
       }
     } else if (inimigo.tipo === "voador_acido") {
-      // Deslocamento inicial quando solto pelo Boss até o canto esquerdo ou meio do mapa
+      // Deslocamento inicial quando solto pelo Boss até os pontos aéreos da arena
       if (inimigo.indoParaPosicaoBoss) {
         const dx = inimigo.destinoX - inimigo.x;
         const dy = inimigo.destinoY - inimigo.y;
@@ -2611,29 +2620,29 @@ function atualizarInimigos() {
 function invocarVoadoresDoBoss(boss) {
   const voadoresAtivos = estadoJogo.inimigos.filter((e) => e.tipo === "voador_acido");
   const temEsquerda = voadoresAtivos.some((v) => v.slotBoss === "esquerda");
-  const temMeio = voadoresAtivos.some((v) => v.slotBoss === "meio");
+  const temDireita = voadoresAtivos.some((v) => v.slotBoss === "direita");
 
   const destinos = [];
   if (!temEsquerda) {
     destinos.push({
       slot: "esquerda",
-      destinoX: 115,
-      destinoY: 112,
-      amplitude: 85
+      destinoX: 165,
+      destinoY: 108,
+      amplitude: 95
     });
   }
-  if (!temMeio) {
+  if (!temDireita) {
     destinos.push({
-      slot: "meio",
-      destinoX: 430,
+      slot: "direita",
+      destinoX: 565,
       destinoY: 102,
-      amplitude: 105
+      amplitude: 115
     });
   }
 
   for (let i = 0; i < destinos.length; i++) {
     const cfg = destinos[i];
-    const origemX = boss.x + boss.largura * 0.42;
+    const origemX = boss.x + boss.largura / 2 + boss.direcaoOlhar * 18;
     const origemY = boss.y + 16;
 
     const voador = criarVoadorAcido(
@@ -2651,7 +2660,7 @@ function invocarVoadoresDoBoss(boss) {
     voador.destinoX = cfg.destinoX;
     voador.destinoY = cfg.destinoY;
     voador.ativoPatrulha = false;
-    voador.direcaoVoo = -1;
+    voador.direcaoVoo = boss.direcaoOlhar;
 
     estadoJogo.inimigos.push(voador);
 
@@ -2670,7 +2679,8 @@ function invocarVoadoresDoBoss(boss) {
 }
 
 function invocarRastejadoresDoBoss(boss) {
-  const pontoImpactoX = boss.x - 18;
+  const dir = boss.direcaoOlhar;
+  const pontoImpactoX = dir === -1 ? boss.x - 18 : boss.x + boss.largura + 18;
 
   estadoJogo.efeitosImpacto.push({
     x: pontoImpactoX,
@@ -2686,7 +2696,7 @@ function invocarRastejadoresDoBoss(boss) {
     estadoJogo.particulasDano.push({
       x: pontoImpactoX + (Math.random() - 0.5) * 30,
       y: CHAO_Y - 2,
-      vx: -1.5 - Math.random() * 4.5,
+      vx: dir * (1.5 + Math.random() * 4.5),
       vy: -2.2 - Math.random() * 3.8,
       vida: 18 + Math.floor(Math.random() * 12),
       tamanho: 3 + Math.random() * 3.5,
@@ -2695,7 +2705,7 @@ function invocarRastejadoresDoBoss(boss) {
   }
 
   for (let k = 0; k < 3; k++) {
-    const spawnX = Math.max(40, pontoImpactoX - k * 44);
+    const spawnX = Math.max(40, Math.min(820, pontoImpactoX + dir * (k * 44)));
     const variante = k === 1 ? "azul" : "normal";
     const rastejador = criarRastejador(
       spawnX,
@@ -2707,7 +2717,7 @@ function invocarRastejadoresDoBoss(boss) {
     );
 
     rastejador.estado = "atacando";
-    rastejador.direcaoOlhar = -1;
+    rastejador.direcaoOlhar = dir;
     rastejador.vy = -3.8 - k * 0.7;
     rastejador.y = CHAO_Y - rastejador.altura - 6;
 
@@ -2737,28 +2747,123 @@ function atualizarBoss() {
   }
 
   if (boss.estado === "parado") {
+    boss.escalaX += (1 - boss.escalaX) * 0.25;
+    boss.escalaY += (1 - boss.escalaY) * 0.25;
     boss.timerEstado--;
+
     if (boss.timerEstado <= 0) {
       const voadoresVivos = estadoJogo.inimigos.filter((e) => e.tipo === "voador_acido").length;
       const rastejadoresVivos = estadoJogo.inimigos.filter((e) => e.tipo === "rastejador").length;
 
-      const sequencia = ["rindo", "olhando_cima", "socando_chao"];
-      let proximaAcao = sequencia[boss.indiceCicloAtaque % sequencia.length];
-      boss.indiceCicloAtaque++;
+      // De vez em quando o Boss agacha e pula para o outro lado do mapa (e vice-versa)
+      const devePularDeLado =
+        boss.acoesDesdeUltimoPulo >= 3 ||
+        (boss.acoesDesdeUltimoPulo >= 2 && Math.random() < 0.45);
 
-      if (proximaAcao === "olhando_cima" && voadoresVivos >= 2) {
-        proximaAcao = rastejadoresVivos < 4 ? "socando_chao" : "rindo";
-      } else if (proximaAcao === "socando_chao" && rastejadoresVivos >= 4) {
-        proximaAcao = voadoresVivos < 2 ? "olhando_cima" : "rindo";
+      if (devePularDeLado) {
+        boss.estado = "agachando";
+        boss.frameAcao = 0;
+        boss.invocouNaAcao = false;
+        boss.acoesDesdeUltimoPulo = 0;
+      } else {
+        const sequencia = ["rindo", "olhando_cima", "socando_chao"];
+        let proximaAcao = sequencia[boss.indiceCicloAtaque % sequencia.length];
+        boss.indiceCicloAtaque++;
+        boss.acoesDesdeUltimoPulo++;
+
+        if (proximaAcao === "olhando_cima" && voadoresVivos >= 2) {
+          proximaAcao = rastejadoresVivos < 4 ? "socando_chao" : "rindo";
+        } else if (proximaAcao === "socando_chao" && rastejadoresVivos >= 4) {
+          proximaAcao = voadoresVivos < 2 ? "olhando_cima" : "rindo";
+        }
+
+        boss.estado = proximaAcao;
+        boss.frameAcao = 0;
+        boss.invocouNaAcao = false;
+
+        if (proximaAcao === "rindo") {
+          tocarSfxRisadaBoss();
+        }
       }
+    }
+  } else if (boss.estado === "agachando") {
+    boss.frameAcao++;
+    const progressoAgacho = Math.min(1, boss.frameAcao / 28);
+    boss.escalaX = 1 + Math.sin(progressoAgacho * (Math.PI / 2)) * 0.18;
+    boss.escalaY = 1 - Math.sin(progressoAgacho * (Math.PI / 2)) * 0.32;
 
-      boss.estado = proximaAcao;
+    if (boss.frameAcao % 6 === 0) {
+      estadoJogo.particulasDano.push({
+        x: boss.x + boss.largura / 2 + (Math.random() - 0.5) * 90,
+        y: CHAO_Y - 2,
+        vx: (Math.random() - 0.5) * 2.5,
+        vy: -1.2 - Math.random() * 1.6,
+        vida: 14,
+        tamanho: 3,
+        cor: "#adb5bd"
+      });
+    }
+
+    if (boss.frameAcao >= 28) {
+      boss.estado = "pulando_lado";
       boss.frameAcao = 0;
-      boss.invocouNaAcao = false;
+      boss.xOrigemPulo = boss.x;
+      boss.xDestinoPulo = boss.lado === "direita" ? 45 : 715;
+      boss.escalaX = 0.88;
+      boss.escalaY = 1.15;
+      tocarSfxPulo();
+    }
+  } else if (boss.estado === "pulando_lado") {
+    boss.frameAcao++;
+    const duracaoPulo = 48;
+    const t = Math.min(1, boss.frameAcao / duracaoPulo);
+    const arcoVertical = Math.sin(Math.PI * t);
 
-      if (proximaAcao === "rindo") {
-        tocarSfxRisadaBoss();
+    boss.x = boss.xOrigemPulo + (boss.xDestinoPulo - boss.xOrigemPulo) * t;
+    boss.y = CHAO_Y - boss.altura - arcoVertical * 195;
+
+    boss.escalaX = 1 - arcoVertical * 0.12;
+    boss.escalaY = 1 + arcoVertical * 0.14;
+
+    if (boss.frameAcao === Math.floor(duracaoPulo / 2)) {
+      boss.direcaoOlhar = boss.xDestinoPulo < 400 ? 1 : -1;
+    }
+
+    if (boss.frameAcao >= duracaoPulo) {
+      boss.x = boss.xDestinoPulo;
+      boss.y = CHAO_Y - boss.altura;
+      boss.lado = boss.xDestinoPulo < 400 ? "esquerda" : "direita";
+      boss.direcaoOlhar = boss.lado === "esquerda" ? 1 : -1;
+      boss.escalaX = 1.16;
+      boss.escalaY = 0.82;
+      boss.tremorChaoFrames = 14;
+      tocarSfxSocoChaoBoss();
+
+      const centroPousoX = boss.x + boss.largura / 2;
+      estadoJogo.efeitosImpacto.push({
+        x: centroPousoX,
+        y: CHAO_Y - 4,
+        raioInicial: 14,
+        raioMax: 78,
+        vida: 18,
+        vidaMax: 18,
+        cor: "#ffd43b"
+      });
+
+      for (let p = 0; p < 16; p++) {
+        estadoJogo.particulasDano.push({
+          x: centroPousoX + (Math.random() - 0.5) * 110,
+          y: CHAO_Y - 2,
+          vx: (Math.random() - 0.5) * 6.5,
+          vy: -2.0 - Math.random() * 3.5,
+          vida: 18 + Math.floor(Math.random() * 10),
+          tamanho: 3.5,
+          cor: p % 2 === 0 ? "#8c6239" : "#ffd43b"
+        });
       }
+
+      boss.estado = "parado";
+      boss.timerEstado = 55;
     }
   } else if (boss.estado === "rindo") {
     boss.frameAcao++;
@@ -2766,9 +2871,9 @@ function atualizarBoss() {
     if (boss.frameAcao % 18 === 1) {
       boss.risadasFlutuantes.push({
         texto: "HA!",
-        x: boss.x + 25 + (Math.random() - 0.5) * 36,
+        x: boss.x + boss.largura / 2 + boss.direcaoOlhar * 45 + (Math.random() - 0.5) * 32,
         y: boss.y + 10,
-        vx: -0.7 - Math.random() * 0.6,
+        vx: boss.direcaoOlhar * (0.7 + Math.random() * 0.6),
         vy: -1.3,
         vida: 36,
         vidaMax: 36
@@ -2807,7 +2912,15 @@ function atualizarBoss() {
     }
   }
 
-  if (colidiu(soldado, boss)) {
+  const alturaEfetivaBoss = boss.altura * (boss.escalaY || 1);
+  const hitboxBoss = {
+    x: boss.x,
+    y: boss.y + (boss.altura - alturaEfetivaBoss),
+    largura: boss.largura,
+    altura: alturaEfetivaBoss
+  };
+
+  if (colidiu(soldado, hitboxBoss)) {
     const direcaoImpacto =
       soldado.x + soldado.largura / 2 < boss.x + boss.largura / 2 ? -1 : 1;
     aplicarDanoSoldado(1, direcaoImpacto);
@@ -2831,14 +2944,7 @@ function encontrarObstaculoBloqueadorTiro(tiro) {
     }
   }
 
-  for (let i = 0; i < estadoJogo.plataformas.length; i++) {
-    const plat = estadoJogo.plataformas[i];
-    if (plat.desmoronando) continue;
-    if (colidiu(tiro, plat)) {
-      return plat;
-    }
-  }
-
+  // As balas dos inimigos e do soldado atravessam plataformas
   return null;
 }
 
@@ -2938,20 +3044,30 @@ function atualizarProjeteis() {
       }
     }
 
-    if (!acertou && estadoJogo.boss && colidiu(tiro, estadoJogo.boss)) {
-      estadoJogo.boss.vida -= 1;
-      estadoJogo.boss.danoFrames = 8;
-      acertou = true;
-      estadoJogo.pontuacao += 25;
-      const bossEliminado = estadoJogo.boss.vida <= 0;
-      tocarSfxAcertoInimigo(bossEliminado);
+    if (!acertou && estadoJogo.boss) {
+      const alturaEfetivaBoss = estadoJogo.boss.altura * (estadoJogo.boss.escalaY || 1);
+      const hitboxBoss = {
+        x: estadoJogo.boss.x,
+        y: estadoJogo.boss.y + (estadoJogo.boss.altura - alturaEfetivaBoss),
+        largura: estadoJogo.boss.largura,
+        altura: alturaEfetivaBoss
+      };
 
-      if (bossEliminado) {
-        estadoJogo.pontuacao += 1000;
-        estadoJogo.boss = null;
-        estadoJogo.tirosInimigos = [];
-        concluirFaseComVitoria(estadoJogo.nivelIndice);
-        return;
+      if (colidiu(tiro, hitboxBoss)) {
+        estadoJogo.boss.vida -= 1;
+        estadoJogo.boss.danoFrames = 8;
+        acertou = true;
+        estadoJogo.pontuacao += 25;
+        const bossEliminado = estadoJogo.boss.vida <= 0;
+        tocarSfxAcertoInimigo(bossEliminado);
+
+        if (bossEliminado) {
+          estadoJogo.pontuacao += 1000;
+          estadoJogo.boss = null;
+          estadoJogo.tirosInimigos = [];
+          concluirFaseComVitoria(estadoJogo.nivelIndice);
+          return;
+        }
       }
     }
 
@@ -4585,9 +4701,13 @@ function desenharBossExtraterrestre(boss) {
 
   const baseX = boss.x + boss.largura / 2 + tremorDano + tremorRisada;
   const baseY = boss.y + boss.altura;
+  const dirFlip = -(boss.direcaoOlhar || -1);
+  const escalaX = (boss.escalaX || 1) * dirFlip;
+  const escalaY = boss.escalaY || 1;
 
   ctx.save();
   ctx.translate(baseX, baseY);
+  ctx.scale(escalaX, escalaY);
 
   // Sombra no chão
   ctx.fillStyle = "rgba(0, 0, 0, 0.42)";
