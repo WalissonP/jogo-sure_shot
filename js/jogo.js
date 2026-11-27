@@ -398,6 +398,54 @@ function tocarSfxDerrota() {
   });
 }
 
+function tocarSfxRisadaBoss() {
+  const audioCtx = garantirAudioContexto();
+  if (!audioCtx) return;
+
+  const pulsos = [0, 0.16, 0.32, 0.48];
+  pulsos.forEach((atraso, idx) => {
+    const agora = audioCtx.currentTime + atraso;
+    const osc = audioCtx.createOscillator();
+    const ganho = audioCtx.createGain();
+
+    osc.type = "sawtooth";
+    const freqBase = 155 - idx * 12;
+    osc.frequency.setValueAtTime(freqBase, agora);
+    osc.frequency.exponentialRampToValueAtTime(freqBase * 0.65, agora + 0.12);
+
+    ganho.gain.setValueAtTime(0.06, agora);
+    ganho.gain.exponentialRampToValueAtTime(0.0001, agora + 0.13);
+
+    osc.connect(ganho);
+    ganho.connect(audioCtx.destination);
+
+    osc.start(agora);
+    osc.stop(agora + 0.14);
+  });
+}
+
+function tocarSfxSocoChaoBoss() {
+  const audioCtx = garantirAudioContexto();
+  if (!audioCtx) return;
+
+  const agora = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const ganho = audioCtx.createGain();
+
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(135, agora);
+  osc.frequency.exponentialRampToValueAtTime(34, agora + 0.32);
+
+  ganho.gain.setValueAtTime(0.14, agora);
+  ganho.gain.exponentialRampToValueAtTime(0.0001, agora + 0.34);
+
+  osc.connect(ganho);
+  ganho.connect(audioCtx.destination);
+
+  osc.start(agora);
+  osc.stop(agora + 0.35);
+}
+
 function pararMusicaFase() {
   if (sistemaAudio.timerId !== null) {
     clearInterval(sistemaAudio.timerId);
@@ -1203,18 +1251,30 @@ function criarVoadorAcido(x, yBase, raioDeteccao = 280, amplitudePatrulha = 125,
 }
 
 function criarBoss() {
+  // Ajusta a plataforma da direita um pouco para a esquerda para não colidir com o corpo gigante do boss
+  for (let i = 0; i < estadoJogo.plataformas.length; i++) {
+    if (estadoJogo.plataformas[i].x === 600) {
+      estadoJogo.plataformas[i].x = 490;
+    }
+  }
+
   estadoJogo.boss = {
-    x: 680,
-    y: CHAO_Y - 110,
-    largura: 88,
-    altura: 110,
-    vx: -2.2,
+    x: 715,
+    y: CHAO_Y - 156,
+    largura: 140,
+    altura: 156,
+    vx: 0,
     vy: 0,
-    vida: 35,
-    vidaMaxima: 35,
-    cadenciaTiro: 75,
-    ultimoTiro: 0,
-    danoFrames: 0
+    vida: 60,
+    vidaMaxima: 60,
+    danoFrames: 0,
+    estado: "parado", // "parado" | "rindo" | "olhando_cima" | "socando_chao"
+    timerEstado: 80,
+    frameAcao: 0,
+    indiceCicloAtaque: 0,
+    invocouNaAcao: false,
+    tremorChaoFrames: 0,
+    risadasFlutuantes: []
   };
 }
 
@@ -1939,19 +1999,9 @@ function dispararTiroSoldado() {
 // 7. INIMIGOS, BURACOS, CAMINHO SUBTERRÂNEO EM "U" E BOSS
 // =========================================================
 function gerarInimigos() {
-  const configNivel = NIVEIS[estadoJogo.nivelIndice];
-
-  if (configNivel.numero === 1 || configNivel.numero === 2) return;
-
-  if (estadoJogo.frameAtual % configNivel.intervaloSpawn !== 0) return;
-
-  if (configNivel.numero === 3 && (!estadoJogo.boss || estadoJogo.inimigos.length >= 2)) {
-    return;
-  }
-
-  const spawnX = canvas.width - 40;
-  const variante = estadoJogo.frameAtual % 2 === 0 ? "azul" : "normal";
-  estadoJogo.inimigos.push(criarRastejador(spawnX, 250, 1.55, estadoJogo.frameAtual, variante));
+  // Nas fases 1 e 2 os inimigos já são posicionados no mapa.
+  // Na fase 3 (Boss), apenas os voadores e os rastejadores soltos pelo Boss aparecem.
+  return;
 }
 
 function encontrarObstaculoAFrente(inimigo, dir) {
@@ -2480,38 +2530,61 @@ function atualizarInimigos() {
         }
       }
     } else if (inimigo.tipo === "voador_acido") {
-      const distSoldado = Math.hypot(
-        centroSoldadoX - (inimigo.x + inimigo.largura / 2),
-        centroSoldadoY - (inimigo.y + inimigo.altura / 2)
-      );
+      // Deslocamento inicial quando solto pelo Boss até o canto esquerdo ou meio do mapa
+      if (inimigo.indoParaPosicaoBoss) {
+        const dx = inimigo.destinoX - inimigo.x;
+        const dy = inimigo.destinoY - inimigo.y;
+        const dist = Math.hypot(dx, dy);
 
-      if (!inimigo.ativoPatrulha && distSoldado <= inimigo.raioDeteccao) {
-        inimigo.ativoPatrulha = true;
-        inimigo.direcaoVoo = centroSoldadoX < inimigo.x + inimigo.largura / 2 ? -1 : 1;
-        inimigo.ultimoAcidoFrame = estadoJogo.frameAtual - inimigo.cadenciaAcido + 35;
-      }
-
-      if (inimigo.ativoPatrulha) {
-        const velPatrulha = 1.9;
-        inimigo.x += inimigo.direcaoVoo * velPatrulha;
-
-        if (inimigo.x <= inimigo.xAncora - inimigo.amplitudePatrulha) {
-          inimigo.x = inimigo.xAncora - inimigo.amplitudePatrulha;
+        if (dist <= 6) {
+          inimigo.x = inimigo.destinoX;
+          inimigo.y = inimigo.destinoY;
+          inimigo.xAncora = inimigo.destinoX;
+          inimigo.yBase = inimigo.destinoY;
+          inimigo.indoParaPosicaoBoss = false;
+          inimigo.ativoPatrulha = true;
           inimigo.direcaoVoo = 1;
-        } else if (inimigo.x >= inimigo.xAncora + inimigo.amplitudePatrulha) {
-          inimigo.x = inimigo.xAncora + inimigo.amplitudePatrulha;
-          inimigo.direcaoVoo = -1;
-        }
-
-        inimigo.y = inimigo.yBase + Math.sin(estadoJogo.frameAtual * 0.07 + inimigo.faseAsa) * 14;
-
-        if (estadoJogo.frameAtual - inimigo.ultimoAcidoFrame >= inimigo.cadenciaAcido) {
-          cuspirAcidoEmDirecaoAoSoldado(inimigo);
-          inimigo.ultimoAcidoFrame = estadoJogo.frameAtual;
+          inimigo.ultimoAcidoFrame = estadoJogo.frameAtual - inimigo.cadenciaAcido + 45;
+        } else {
+          const velDeslocamento = 4.6;
+          inimigo.x += (dx / dist) * velDeslocamento;
+          inimigo.y += (dy / dist) * velDeslocamento;
+          inimigo.direcaoVoo = dx < 0 ? -1 : 1;
         }
       } else {
-        inimigo.y = inimigo.yBase + Math.sin(estadoJogo.frameAtual * 0.04 + inimigo.faseAsa) * 4;
-        inimigo.direcaoVoo = centroSoldadoX < inimigo.x + inimigo.largura / 2 ? -1 : 1;
+        const distSoldado = Math.hypot(
+          centroSoldadoX - (inimigo.x + inimigo.largura / 2),
+          centroSoldadoY - (inimigo.y + inimigo.altura / 2)
+        );
+
+        if (!inimigo.ativoPatrulha && distSoldado <= inimigo.raioDeteccao) {
+          inimigo.ativoPatrulha = true;
+          inimigo.direcaoVoo = centroSoldadoX < inimigo.x + inimigo.largura / 2 ? -1 : 1;
+          inimigo.ultimoAcidoFrame = estadoJogo.frameAtual - inimigo.cadenciaAcido + 35;
+        }
+
+        if (inimigo.ativoPatrulha) {
+          const velPatrulha = 1.9;
+          inimigo.x += inimigo.direcaoVoo * velPatrulha;
+
+          if (inimigo.x <= inimigo.xAncora - inimigo.amplitudePatrulha) {
+            inimigo.x = inimigo.xAncora - inimigo.amplitudePatrulha;
+            inimigo.direcaoVoo = 1;
+          } else if (inimigo.x >= inimigo.xAncora + inimigo.amplitudePatrulha) {
+            inimigo.x = inimigo.xAncora + inimigo.amplitudePatrulha;
+            inimigo.direcaoVoo = -1;
+          }
+
+          inimigo.y = inimigo.yBase + Math.sin(estadoJogo.frameAtual * 0.07 + inimigo.faseAsa) * 14;
+
+          if (estadoJogo.frameAtual - inimigo.ultimoAcidoFrame >= inimigo.cadenciaAcido) {
+            cuspirAcidoEmDirecaoAoSoldado(inimigo);
+            inimigo.ultimoAcidoFrame = estadoJogo.frameAtual;
+          }
+        } else {
+          inimigo.y = inimigo.yBase + Math.sin(estadoJogo.frameAtual * 0.04 + inimigo.faseAsa) * 4;
+          inimigo.direcaoVoo = centroSoldadoX < inimigo.x + inimigo.largura / 2 ? -1 : 1;
+        }
       }
     } else {
       inimigo.x += inimigo.vx;
@@ -2535,6 +2608,113 @@ function atualizarInimigos() {
   }
 }
 
+function invocarVoadoresDoBoss(boss) {
+  const voadoresAtivos = estadoJogo.inimigos.filter((e) => e.tipo === "voador_acido");
+  const temEsquerda = voadoresAtivos.some((v) => v.slotBoss === "esquerda");
+  const temMeio = voadoresAtivos.some((v) => v.slotBoss === "meio");
+
+  const destinos = [];
+  if (!temEsquerda) {
+    destinos.push({
+      slot: "esquerda",
+      destinoX: 115,
+      destinoY: 112,
+      amplitude: 85
+    });
+  }
+  if (!temMeio) {
+    destinos.push({
+      slot: "meio",
+      destinoX: 430,
+      destinoY: 102,
+      amplitude: 105
+    });
+  }
+
+  for (let i = 0; i < destinos.length; i++) {
+    const cfg = destinos[i];
+    const origemX = boss.x + boss.largura * 0.42;
+    const origemY = boss.y + 16;
+
+    const voador = criarVoadorAcido(
+      cfg.destinoX,
+      cfg.destinoY,
+      9999,
+      cfg.amplitude,
+      estadoJogo.frameAtual * 0.1 + i * 1.7
+    );
+
+    voador.x = origemX;
+    voador.y = origemY;
+    voador.slotBoss = cfg.slot;
+    voador.indoParaPosicaoBoss = true;
+    voador.destinoX = cfg.destinoX;
+    voador.destinoY = cfg.destinoY;
+    voador.ativoPatrulha = false;
+    voador.direcaoVoo = -1;
+
+    estadoJogo.inimigos.push(voador);
+
+    for (let p = 0; p < 10; p++) {
+      estadoJogo.particulasDano.push({
+        x: origemX,
+        y: origemY,
+        vx: (Math.random() - 0.5) * 4.5,
+        vy: -2 - Math.random() * 3.5,
+        vida: 18 + Math.floor(Math.random() * 10),
+        tamanho: 3 + Math.random() * 3,
+        cor: p % 2 === 0 ? "#94d82d" : "#ff6b6b"
+      });
+    }
+  }
+}
+
+function invocarRastejadoresDoBoss(boss) {
+  const pontoImpactoX = boss.x - 18;
+
+  estadoJogo.efeitosImpacto.push({
+    x: pontoImpactoX,
+    y: CHAO_Y - 4,
+    raioInicial: 8,
+    raioMax: 48,
+    vida: 16,
+    vidaMax: 16,
+    cor: "#ff922b"
+  });
+
+  for (let p = 0; p < 18; p++) {
+    estadoJogo.particulasDano.push({
+      x: pontoImpactoX + (Math.random() - 0.5) * 30,
+      y: CHAO_Y - 2,
+      vx: -1.5 - Math.random() * 4.5,
+      vy: -2.2 - Math.random() * 3.8,
+      vida: 18 + Math.floor(Math.random() * 12),
+      tamanho: 3 + Math.random() * 3.5,
+      cor: p % 2 === 0 ? "#8c6239" : "#d9480f"
+    });
+  }
+
+  for (let k = 0; k < 3; k++) {
+    const spawnX = Math.max(40, pontoImpactoX - k * 44);
+    const variante = k === 1 ? "azul" : "normal";
+    const rastejador = criarRastejador(
+      spawnX,
+      9999,
+      1.75 + k * 0.12,
+      estadoJogo.frameAtual + k,
+      variante,
+      CHAO_Y
+    );
+
+    rastejador.estado = "atacando";
+    rastejador.direcaoOlhar = -1;
+    rastejador.vy = -3.8 - k * 0.7;
+    rastejador.y = CHAO_Y - rastejador.altura - 6;
+
+    estadoJogo.inimigos.push(rastejador);
+  }
+}
+
 function atualizarBoss() {
   const boss = estadoJogo.boss;
   if (!boss) return;
@@ -2542,23 +2722,89 @@ function atualizarBoss() {
   if (boss.danoFrames > 0) {
     boss.danoFrames--;
   }
-
-  boss.x += boss.vx;
-  if (boss.x <= 460 || boss.x + boss.largura >= canvas.width - 20) {
-    boss.vx *= -1;
+  if (boss.tremorChaoFrames > 0) {
+    boss.tremorChaoFrames--;
   }
 
-  if (estadoJogo.frameAtual - boss.ultimoTiro >= boss.cadenciaTiro) {
-    const alturaTiro = boss.vida % 2 === 0 ? boss.y + boss.altura - 24 : boss.y + 38;
-    estadoJogo.tirosInimigos.push({
-      x: boss.x - 12,
-      y: alturaTiro,
-      largura: 16,
-      altura: 8,
-      vx: -6.2,
-      vy: 0
-    });
-    boss.ultimoTiro = estadoJogo.frameAtual;
+  for (let i = boss.risadasFlutuantes.length - 1; i >= 0; i--) {
+    const r = boss.risadasFlutuantes[i];
+    r.x += r.vx;
+    r.y += r.vy;
+    r.vida--;
+    if (r.vida <= 0) {
+      boss.risadasFlutuantes.splice(i, 1);
+    }
+  }
+
+  if (boss.estado === "parado") {
+    boss.timerEstado--;
+    if (boss.timerEstado <= 0) {
+      const voadoresVivos = estadoJogo.inimigos.filter((e) => e.tipo === "voador_acido").length;
+      const rastejadoresVivos = estadoJogo.inimigos.filter((e) => e.tipo === "rastejador").length;
+
+      const sequencia = ["rindo", "olhando_cima", "socando_chao"];
+      let proximaAcao = sequencia[boss.indiceCicloAtaque % sequencia.length];
+      boss.indiceCicloAtaque++;
+
+      if (proximaAcao === "olhando_cima" && voadoresVivos >= 2) {
+        proximaAcao = rastejadoresVivos < 4 ? "socando_chao" : "rindo";
+      } else if (proximaAcao === "socando_chao" && rastejadoresVivos >= 4) {
+        proximaAcao = voadoresVivos < 2 ? "olhando_cima" : "rindo";
+      }
+
+      boss.estado = proximaAcao;
+      boss.frameAcao = 0;
+      boss.invocouNaAcao = false;
+
+      if (proximaAcao === "rindo") {
+        tocarSfxRisadaBoss();
+      }
+    }
+  } else if (boss.estado === "rindo") {
+    boss.frameAcao++;
+
+    if (boss.frameAcao % 18 === 1) {
+      boss.risadasFlutuantes.push({
+        texto: "HA!",
+        x: boss.x + 25 + (Math.random() - 0.5) * 36,
+        y: boss.y + 10,
+        vx: -0.7 - Math.random() * 0.6,
+        vy: -1.3,
+        vida: 36,
+        vidaMax: 36
+      });
+    }
+
+    if (boss.frameAcao >= 96) {
+      boss.estado = "parado";
+      boss.timerEstado = 75;
+    }
+  } else if (boss.estado === "olhando_cima") {
+    boss.frameAcao++;
+
+    if (boss.frameAcao === 42 && !boss.invocouNaAcao) {
+      invocarVoadoresDoBoss(boss);
+      boss.invocouNaAcao = true;
+    }
+
+    if (boss.frameAcao >= 90) {
+      boss.estado = "parado";
+      boss.timerEstado = 85;
+    }
+  } else if (boss.estado === "socando_chao") {
+    boss.frameAcao++;
+
+    if (boss.frameAcao === 33 && !boss.invocouNaAcao) {
+      boss.tremorChaoFrames = 16;
+      tocarSfxSocoChaoBoss();
+      invocarRastejadoresDoBoss(boss);
+      boss.invocouNaAcao = true;
+    }
+
+    if (boss.frameAcao >= 88) {
+      boss.estado = "parado";
+      boss.timerEstado = 90;
+    }
   }
 
   if (colidiu(soldado, boss)) {
@@ -4324,6 +4570,285 @@ function desenharFuzil(origemX, origemY, angulo, atirouAgora) {
   ctx.restore();
 }
 
+function desenharBossExtraterrestre(boss) {
+  const emDano = boss.danoFrames > 0;
+  const rindo = boss.estado === "rindo";
+  const olhandoCima = boss.estado === "olhando_cima";
+  const socando = boss.estado === "socando_chao";
+
+  const tremorDano = emDano ? Math.sin(estadoJogo.frameAtual * 1.5) * 4 : 0;
+  const tremorRisada = rindo ? Math.sin(estadoJogo.frameAtual * 0.9) * 3 : 0;
+  const respiracao = Math.sin(estadoJogo.frameAtual * 0.08) * 3;
+  const balancoBarriga = rindo
+    ? Math.sin(estadoJogo.frameAtual * 0.85) * 6
+    : respiracao;
+
+  const baseX = boss.x + boss.largura / 2 + tremorDano + tremorRisada;
+  const baseY = boss.y + boss.altura;
+
+  ctx.save();
+  ctx.translate(baseX, baseY);
+
+  // Sombra no chão
+  ctx.fillStyle = "rgba(0, 0, 0, 0.42)";
+  ctx.beginPath();
+  ctx.ellipse(0, 2, 74, 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Pernas grossas e pés com garras
+  const corPeleEscura = emDano ? "#ff8787" : "#861616";
+  const corPeleMedia = emDano ? "#ffa8a8" : "#c92a2a";
+  const corPeleClara = emDano ? "#ffe3e3" : "#e03131";
+  const corBarriga = emDano ? "#ffc9c9" : "#fa5252";
+
+  ctx.fillStyle = corPeleEscura;
+  ctx.beginPath();
+  ctx.roundRect(-48, -36, 34, 34, 10);
+  ctx.roundRect(14, -36, 34, 34, 10);
+  ctx.fill();
+
+  // Garras dos pés
+  ctx.fillStyle = "#f1f3f5";
+  [-52, -41, -30, 10, 21, 32].forEach((gx) => {
+    ctx.beginPath();
+    ctx.moveTo(gx, 0);
+    ctx.lineTo(gx - 5, -9);
+    ctx.lineTo(gx + 5, 0);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  // Braço direito (fundo)
+  ctx.fillStyle = corPeleEscura;
+  ctx.beginPath();
+  ctx.ellipse(56, -78 + respiracao * 0.5, 18, 34, -0.25, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Corpo grande e gordo (tronco + pança monstruosa)
+  const gradCorpo = ctx.createRadialGradient(-12, -82, 14, 0, -76, 82);
+  gradCorpo.addColorStop(0, corPeleClara);
+  gradCorpo.addColorStop(0.65, corPeleMedia);
+  gradCorpo.addColorStop(1, corPeleEscura);
+
+  ctx.fillStyle = gradCorpo;
+  ctx.strokeStyle = "#3b0707";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(0, -74 + balancoBarriga * 0.3, 66 + balancoBarriga * 0.5, 56, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Barriga protuberante / dobras
+  ctx.fillStyle = corBarriga;
+  ctx.beginPath();
+  ctx.ellipse(-12, -62 + balancoBarriga * 0.5, 46 + balancoBarriga * 0.6, 38, -0.08, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "#7a1212";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(-14, -56 + balancoBarriga * 0.5, 28, 0.25, Math.PI - 0.25);
+  ctx.stroke();
+
+  // Verrugas / placas alienígenas nos ombros
+  ctx.fillStyle = "#7a1212";
+  ctx.beginPath();
+  ctx.arc(32, -96, 6, 0, Math.PI * 2);
+  ctx.arc(44, -84, 4.5, 0, Math.PI * 2);
+  ctx.arc(-40, -94, 5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Cabeça e chifres grandes (inclinam para cima quando vai soltar voadores)
+  const anguloCabeca = olhandoCima
+    ? 0.48
+    : rindo
+    ? 0.2 + Math.sin(estadoJogo.frameAtual * 0.9) * 0.12
+    : 0;
+
+  ctx.save();
+  ctx.translate(-8, -124 + balancoBarriga * 0.25);
+  ctx.rotate(anguloCabeca);
+
+  // Chifre traseiro (grande e curvado)
+  ctx.fillStyle = "#ced4da";
+  ctx.strokeStyle = "#212529";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(10, -14);
+  ctx.quadraticCurveTo(44, -46, 36, -78);
+  ctx.quadraticCurveTo(22, -52, -2, -22);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Crânio monstruoso vermelho
+  ctx.fillStyle = corPeleClara;
+  ctx.beginPath();
+  ctx.ellipse(0, -8, 34, 27, -0.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Chifre dianteiro (enorme e curvado para frente/cima)
+  const gradChifre = ctx.createLinearGradient(-12, -16, -46, -82);
+  gradChifre.addColorStop(0, "#f8f9fa");
+  gradChifre.addColorStop(0.7, "#adb5bd");
+  gradChifre.addColorStop(1, "#495057");
+
+  ctx.fillStyle = gradChifre;
+  ctx.beginPath();
+  ctx.moveTo(-14, -14);
+  ctx.quadraticCurveTo(-56, -34, -48, -80);
+  ctx.quadraticCurveTo(-30, -48, -2, -24);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Arcada superciliar furiosa
+  ctx.fillStyle = "#660c0c";
+  ctx.beginPath();
+  ctx.moveTo(-30, -16);
+  ctx.lineTo(-8, -10);
+  ctx.lineTo(-10, -4);
+  ctx.lineTo(-30, -10);
+  ctx.closePath();
+  ctx.fill();
+
+  // Olhos alienígenas brilhantes (3 olhos monstruosos)
+  ctx.fillStyle = olhandoCima ? "#94d82d" : "#ffe066";
+  ctx.beginPath();
+  ctx.ellipse(-20, -9, 6.5, 4.5, -0.2, 0, Math.PI * 2);
+  ctx.ellipse(-9, -8, 4.5, 3.5, 0.1, 0, Math.PI * 2);
+  ctx.arc(-16, -20, 3.8, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#111417";
+  ctx.fillRect(-22, -11, 2.2, 5);
+  ctx.fillRect(-10, -10, 1.8, 4);
+  ctx.fillRect(-17, -22, 1.8, 4);
+
+  // Boca monstruosa com presas
+  const aberturaBoca = rindo
+    ? 14 + Math.abs(Math.sin(estadoJogo.frameAtual * 0.9)) * 7
+    : olhandoCima
+    ? 15
+    : 6;
+
+  ctx.fillStyle = "#2b0505";
+  ctx.beginPath();
+  ctx.ellipse(-15, 8, 21, aberturaBoca, -0.05, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#4a0808";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Dentes e presas afiadas
+  ctx.fillStyle = "#f8f9fa";
+  const dentesX = [-28, -20, -12, -4];
+  for (let d = 0; d < dentesX.length; d++) {
+    const dx = dentesX[d];
+    ctx.beginPath();
+    ctx.moveTo(dx - 3, 8 - aberturaBoca * 0.75);
+    ctx.lineTo(dx, 8 - aberturaBoca * 0.15);
+    ctx.lineTo(dx + 3, 8 - aberturaBoca * 0.75);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(dx - 3, 8 + aberturaBoca * 0.75);
+    ctx.lineTo(dx, 8 + aberturaBoca * 0.15);
+    ctx.lineTo(dx + 3, 8 + aberturaBoca * 0.75);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
+
+  // Braço gigante frontal (anima o soco no chão)
+  const ombroX = -46;
+  const ombroY = -92;
+  let punhoX = -68;
+  let punhoY = -44 + respiracao;
+
+  if (socando) {
+    if (boss.frameAcao < 33) {
+      // Erguendo o braço bem alto antes do soco
+      const t = boss.frameAcao / 33;
+      punhoX = -52 + t * 18;
+      punhoY = -44 - t * 112;
+    } else {
+      // Punho esmagando o chão
+      punhoX = -82;
+      punhoY = -16;
+    }
+  } else if (rindo) {
+    punhoX = -62;
+    punhoY = -56 + Math.sin(estadoJogo.frameAtual * 0.9) * 8;
+  }
+
+  ctx.strokeStyle = "#3b0707";
+  ctx.lineWidth = 26;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(ombroX, ombroY);
+  ctx.quadraticCurveTo((ombroX + punhoX) / 2 - 14, (ombroY + punhoY) / 2 - 10, punhoX, punhoY);
+  ctx.stroke();
+
+  ctx.strokeStyle = corPeleClara;
+  ctx.lineWidth = 20;
+  ctx.beginPath();
+  ctx.moveTo(ombroX, ombroY);
+  ctx.quadraticCurveTo((ombroX + punhoX) / 2 - 14, (ombroY + punhoY) / 2 - 10, punhoX, punhoY);
+  ctx.stroke();
+
+  // Punho monstruoso com garras
+  ctx.fillStyle = corPeleEscura;
+  ctx.strokeStyle = "#2b0505";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(punhoX, punhoY, 19, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#f1f3f5";
+  for (let g = -1; g <= 1; g++) {
+    ctx.beginPath();
+    ctx.moveTo(punhoX - 14, punhoY + g * 8 - 3);
+    ctx.lineTo(punhoX - 24, punhoY + g * 9);
+    ctx.lineTo(punhoX - 14, punhoY + g * 8 + 3);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Onda de choque no chão no momento do soco
+  if (socando && boss.frameAcao >= 33 && boss.frameAcao <= 52) {
+    const progressoOnda = (boss.frameAcao - 33) / 19;
+    ctx.strokeStyle = `rgba(255, 212, 59, ${1 - progressoOnda})`;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.ellipse(punhoX, -2, 20 + progressoOnda * 58, 8 + progressoOnda * 10, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+
+  // Textos "HA!" flutuando quando ele está rindo
+  if (boss.risadasFlutuantes && boss.risadasFlutuantes.length > 0) {
+    ctx.save();
+    ctx.font = "bold 16px Segoe UI, sans-serif";
+    ctx.textAlign = "center";
+    for (let i = 0; i < boss.risadasFlutuantes.length; i++) {
+      const r = boss.risadasFlutuantes[i];
+      ctx.globalAlpha = Math.max(0, r.vida / r.vidaMax);
+      ctx.fillStyle = "#ffe066";
+      ctx.strokeStyle = "#2b0505";
+      ctx.lineWidth = 3;
+      ctx.strokeText(r.texto, r.x, r.y);
+      ctx.fillText(r.texto, r.x, r.y);
+    }
+    ctx.restore();
+  }
+}
+
 function desenharCena() {
   if (estadoJogo.status === "lobby") {
     desenharMapaLobbyCuphead();
@@ -4347,8 +4872,13 @@ function desenharCena() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
+  const tremorY =
+    estadoJogo.boss && estadoJogo.boss.tremorChaoFrames > 0
+      ? Math.sin(estadoJogo.frameAtual * 1.9) * 5
+      : 0;
+
   ctx.save();
-  ctx.translate(-estadoJogo.cameraX, 0);
+  ctx.translate(-estadoJogo.cameraX, tremorY);
 
   if (configNivel.numero !== 1 && configNivel.numero !== 2) {
     ctx.fillStyle = configNivel.corChao;
@@ -4413,16 +4943,7 @@ function desenharCena() {
   }
 
   if (estadoJogo.boss) {
-    const boss = estadoJogo.boss;
-    const bossEmDano = boss.danoFrames > 0;
-    const tremorBoss = bossEmDano ? Math.sin(estadoJogo.frameAtual * 1.4) * 3 : 0;
-
-    ctx.fillStyle = bossEmDano ? "#ff8787" : "#e03131";
-    ctx.fillRect(boss.x + tremorBoss, boss.y, boss.largura, boss.altura);
-
-    ctx.fillStyle = "#212529";
-    ctx.fillRect(boss.x + tremorBoss - 16, boss.y + 34, 20, 12);
-    ctx.fillRect(boss.x + tremorBoss - 16, boss.y + boss.altura - 26, 20, 12);
+    desenharBossExtraterrestre(estadoJogo.boss);
   }
 
   for (let i = 0; i < estadoJogo.tirosJogador.length; i++) {
