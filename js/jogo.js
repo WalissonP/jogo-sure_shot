@@ -511,6 +511,7 @@ const estadoJogo = {
 
   nivelIndice: 0,
   pontuacao: 0,
+  pontuacaoInicioFase: 0,
   cameraX: 0,
   frameAtual: 0,
   ultimoTiroFrame: 0,
@@ -548,15 +549,19 @@ const soldado = {
   velocidade: 4.5,
   forcaPulo: -13.5,
   noChao: false,
+  plataformaAtual: null,
+  plataformaIgnorada: null,
+  ignorarPlataformaAteFrame: 0,
   caindoNoAbismo: false,
   deitado: false,
   olhandoCima: false,
+  olhandoBaixo: false,
   mirandoParado: false,
   miraDx: 1,
   miraDy: 0,
   direcao: 1,
-  vida: 100,
-  vidaMaxima: 100
+  vida: 3,
+  vidaMaxima: 3
 };
 
 // =========================================================
@@ -729,10 +734,14 @@ function posicionarSoldadoNoNoLobby(indiceNo) {
   const no = NOS_LOBBY[indiceNo] || NOS_LOBBY[0];
   soldado.deitado = false;
   soldado.olhandoCima = false;
+  soldado.olhandoBaixo = false;
   soldado.mirandoParado = false;
   soldado.miraDx = 1;
   soldado.miraDy = 0;
   soldado.caindoNoAbismo = false;
+  soldado.plataformaAtual = null;
+  soldado.plataformaIgnorada = null;
+  soldado.ignorarPlataformaAteFrame = 0;
   soldado.largura = soldado.larguraEmPe;
   soldado.alturaAtual = soldado.alturaEmPe;
   soldado.x = no.x - soldado.largura / 2;
@@ -766,6 +775,7 @@ function resetarProgressoLobby() {
   estadoJogo.maiorFaseDesbloqueada = 0;
   estadoJogo.fasesConcluidas = [];
   estadoJogo.pontuacao = 0;
+  estadoJogo.pontuacaoInicioFase = 0;
   salvarProgresso();
   if (estadoJogo.status === "lobby") {
     posicionarSoldadoNoNoLobby(0);
@@ -855,6 +865,12 @@ function iniciarFase(indice) {
   const indiceValido = Math.max(0, Math.min(NIVEIS.length - 1, indice));
   if (!faseEstaDesbloqueada(indiceValido)) return;
 
+  if (estadoJogo.status === "lobby" || estadoJogo.status === "menu") {
+    estadoJogo.pontuacaoInicioFase = estadoJogo.pontuacao;
+  } else {
+    estadoJogo.pontuacao = estadoJogo.pontuacaoInicioFase;
+  }
+
   estadoJogo.status = "jogando";
   estadoJogo.nivelIndice = indiceValido;
   estadoJogo.frameAtual = 0;
@@ -873,10 +889,15 @@ function iniciarFase(indice) {
   soldado.vida = soldado.vidaMaxima;
   soldado.direcao = 1;
   soldado.deitado = false;
+  soldado.olhandoCima = false;
+  soldado.olhandoBaixo = false;
   soldado.mirandoParado = false;
   soldado.miraDx = 1;
   soldado.miraDy = 0;
   soldado.caindoNoAbismo = false;
+  soldado.plataformaAtual = null;
+  soldado.plataformaIgnorada = null;
+  soldado.ignorarPlataformaAteFrame = 0;
   soldado.largura = soldado.larguraEmPe;
   soldado.alturaAtual = soldado.alturaEmPe;
 
@@ -908,10 +929,15 @@ function carregarNivel(indice) {
   estadoJogo.avisoNivelFrames = 140;
 
   soldado.deitado = false;
+  soldado.olhandoCima = false;
+  soldado.olhandoBaixo = false;
   soldado.mirandoParado = false;
   soldado.miraDx = 1;
   soldado.miraDy = 0;
   soldado.caindoNoAbismo = false;
+  soldado.plataformaAtual = null;
+  soldado.plataformaIgnorada = null;
+  soldado.ignorarPlataformaAteFrame = 0;
   soldado.largura = soldado.larguraEmPe;
   soldado.alturaAtual = soldado.alturaEmPe;
   soldado.x = 100;
@@ -989,7 +1015,7 @@ function configurarMapaFase2Caverna(distanciaMeta) {
   const abismos = [
     { x: 520, largura: 84 },
     { x: 1060, largura: 90 },
-    { x: 1360, largura: 250 }, // Buraco bem grande no mapa
+    { x: 1360, largura: 250 },
     { x: 1840, largura: 88 },
     { x: 2340, largura: 92 },
     { x: 2800, largura: 88 }
@@ -1023,7 +1049,6 @@ function configurarMapaFase2Caverna(distanciaMeta) {
     });
   }
 
-  // Apenas plataformas pontuais: a que desaba no abismo grande e uma suspensa no meio da caverna
   const abismosComPlataforma = [1360, 1840];
 
   for (let i = 0; i < abismos.length; i++) {
@@ -1033,7 +1058,6 @@ function configurarMapaFase2Caverna(distanciaMeta) {
     const ehBuracoGrande = ab.largura >= 160;
 
     if (ehBuracoGrande) {
-      // Plataforma que desaba no meio do buraco grande para ajudar na travessia
       const larguraPlat = 120;
       const xPlat = ab.x + (ab.largura - larguraPlat) / 2;
       estadoJogo.plataformas.push({
@@ -1082,15 +1106,10 @@ function posicionarRastejadoresMapa() {
 
 function posicionarRastejadoresFase2() {
   const pontosFase2 = [
-    // Trecho 1: guarda o solo e a rocha elevada após o 1º abismo
     { x: 730, alcance: 240, velocidadeAtaque: 1.55, variante: "normal", yBase: CHAO_Y },
     { x: 850, alcance: 250, velocidadeAtaque: 1.6, variante: "azul", yBase: CHAO_Y - 66 },
-
-    // Trecho 2: meio da caverna, após o grande abismo
     { x: 1865, alcance: 255, velocidadeAtaque: 1.7, variante: "azul", yBase: CHAO_Y - 108 },
     { x: 1995, alcance: 250, velocidadeAtaque: 1.75, variante: "normal", yBase: CHAO_Y },
-
-    // Trecho 3: reta final antes da saída da caverna
     { x: 2565, alcance: 260, velocidadeAtaque: 1.8, variante: "azul", yBase: CHAO_Y - 54 },
     { x: 3042, alcance: 265, velocidadeAtaque: 1.85, variante: "normal", yBase: CHAO_Y }
   ];
@@ -1105,7 +1124,6 @@ function posicionarRastejadoresFase2() {
 
 function posicionarVoadoresFase2() {
   const locaisVoadores = [
-    // Apenas 3 patrulhas aéreas espaçadas ao longo da caverna
     { x: 1105, y: 145, raioDeteccao: 280, amplitudePatrulha: 95, offsetTiro: 40 },
     { x: 2100, y: 138, raioDeteccao: 290, amplitudePatrulha: 100, offsetTiro: 120 },
     { x: 2840, y: 140, raioDeteccao: 295, amplitudePatrulha: 95, offsetTiro: 190 }
@@ -1297,8 +1315,10 @@ function finalizarDerrota(motivoQueda = false) {
   tituloFim.textContent = motivoQueda ? "Você Caiu no Abismo!" : "Soldado Abatido!";
   mensagemFim.textContent = motivoQueda
     ? "Você caiu em um buraco sem fundo. Tente novamente ou volte ao lobby."
-    : "Sua energia chegou a zero. Tente novamente ou volte ao lobby.";
+    : "Você perdeu todos os seus corações. Tente novamente ou volte ao lobby.";
   pontuacaoFinalEl.textContent = estadoJogo.pontuacao;
+  estadoJogo.pontuacao = 0;
+  estadoJogo.pontuacaoInicioFase = 0;
   atualizarBarraLobbyUI();
   atualizarBotaoMusicaUI();
   esconderTodosOverlays();
@@ -1610,10 +1630,21 @@ function atualizarMiraESoldado() {
       soldado.miraDy = 0;
     }
     soldado.olhandoCima = soldado.miraDy < 0 && soldado.miraDx === 0;
+    soldado.olhandoBaixo = soldado.miraDy > 0 && soldado.miraDx === 0;
   } else {
     soldado.miraDx = soldado.direcao;
     soldado.miraDy = 0;
     soldado.olhandoCima = Boolean(cima && !soldado.deitado);
+    soldado.olhandoBaixo = Boolean(!soldado.noChao && !soldado.deitado && baixo && !cima);
+  }
+
+  if (pular && soldado.noChao && soldado.deitado && soldado.plataformaAtual) {
+    soldado.plataformaIgnorada = soldado.plataformaAtual;
+    soldado.ignorarPlataformaAteFrame = estadoJogo.frameAtual + 20;
+    soldado.noChao = false;
+    soldado.plataformaAtual = null;
+    soldado.vy = 2.5;
+    soldado.y += 4;
   }
 
   const querDeitar = Boolean(!segurandoTravaMira && baixo && soldado.noChao);
@@ -1678,6 +1709,7 @@ function atualizarMiraESoldado() {
   if (pular && soldado.noChao && !soldado.deitado) {
     soldado.vy = soldado.forcaPulo;
     soldado.noChao = false;
+    soldado.plataformaAtual = null;
     tocarSfxPulo();
   }
 
@@ -1718,10 +1750,19 @@ function atualizarMiraESoldado() {
     soldado.x = configNivel.distanciaMeta - soldado.largura;
   }
 
+  if (
+    soldado.plataformaIgnorada &&
+    (estadoJogo.frameAtual >= soldado.ignorarPlataformaAteFrame ||
+      soldado.y > soldado.plataformaIgnorada.y + soldado.plataformaIgnorada.altura)
+  ) {
+    soldado.plataformaIgnorada = null;
+  }
+
   soldado.noChao = false;
+  soldado.plataformaAtual = null;
   for (let i = 0; i < estadoJogo.plataformas.length; i++) {
     const plat = estadoJogo.plataformas[i];
-    if (plat.desmoronando) continue;
+    if (plat.desmoronando || plat === soldado.plataformaIgnorada) continue;
 
     const dentroX = soldado.x + soldado.largura > plat.x && soldado.x < plat.x + plat.largura;
     const cruzouTopo =
@@ -1732,6 +1773,7 @@ function atualizarMiraESoldado() {
       soldado.y = plat.y - soldado.alturaAtual;
       soldado.vy = 0;
       soldado.noChao = true;
+      soldado.plataformaAtual = plat;
 
       if (plat.desmoronavel && !plat.pisada) {
         plat.pisada = true;
@@ -1750,6 +1792,7 @@ function atualizarMiraESoldado() {
       soldado.y = obs.y - soldado.alturaAtual;
       soldado.vy = 0;
       soldado.noChao = true;
+      soldado.plataformaAtual = null;
     }
   }
 
@@ -1766,6 +1809,7 @@ function atualizarMiraESoldado() {
       soldado.y = blocoAlto.y - soldado.alturaAtual;
       soldado.vy = 0;
       soldado.noChao = true;
+      soldado.plataformaAtual = null;
     }
   }
 
@@ -1776,10 +1820,16 @@ function atualizarMiraESoldado() {
     soldado.y = CHAO_Y - soldado.alturaAtual;
     soldado.vy = 0;
     soldado.noChao = true;
+    soldado.plataformaAtual = null;
   } else if (abismoSobrePe && soldado.y + soldado.alturaAtual >= CHAO_Y + 6) {
     soldado.caindoNoAbismo = true;
+    soldado.plataformaAtual = null;
     tocarSfxDano();
     return;
+  }
+
+  if (soldado.noChao) {
+    soldado.olhandoBaixo = false;
   }
 
   if (configNivel.numero < NIVEIS.length) {
@@ -1841,6 +1891,18 @@ function dispararTiroSoldado() {
       angulo: -Math.PI / 2,
       dano: 1,
       nivelTiro: "alto"
+    });
+  } else if (soldado.olhandoBaixo) {
+    estadoJogo.tirosJogador.push({
+      x: soldado.x + soldado.largura / 2 - 3,
+      y: soldado.y + soldado.alturaAtual + 2,
+      largura: 14,
+      altura: 6,
+      vx: 0,
+      vy: velocidadeTiro,
+      angulo: Math.PI / 2,
+      dano: 1,
+      nivelTiro: "baixo"
     });
   } else if (soldado.deitado) {
     const saidaX = soldado.direcao === 1 ? soldado.x + soldado.largura : soldado.x - 14;
@@ -1914,7 +1976,6 @@ function obterSuperficieApoioRastejador(inimigo, yAnterior, apenasApoioAtual = f
   const baseAnterior = yAnterior + inimigo.altura;
   const margemX = 6;
 
-  // 1. Plataformas suspensas
   for (let i = 0; i < estadoJogo.plataformas.length; i++) {
     const plat = estadoJogo.plataformas[i];
     if (plat.desmoronando) continue;
@@ -1934,7 +1995,6 @@ function obterSuperficieApoioRastejador(inimigo, yAnterior, apenasApoioAtual = f
     }
   }
 
-  // 2. Rochas elevadas e obstáculos sólidos
   for (let i = 0; i < estadoJogo.obstaculos.length; i++) {
     const obs = estadoJogo.obstaculos[i];
     const sobreX =
@@ -1952,7 +2012,6 @@ function obterSuperficieApoioRastejador(inimigo, yAnterior, apenasApoioAtual = f
     }
   }
 
-  // 3. Chão principal (fora de abismos)
   const peX = inimigo.x + inimigo.largura / 2;
   const sobreAbismo = encontrarAbismoSobrePe(peX);
   if (!sobreAbismo) {
@@ -2195,7 +2254,6 @@ function atualizarInimigos() {
           inimigo.y = apoioAtual.y - inimigo.altura;
           inimigo.vy = 0;
         } else {
-          // Caindo suavemente caso saia da borda de uma rocha ou plataforma
           inimigo.vy += GRAVIDADE * 0.85;
           inimigo.y += inimigo.vy;
           const pouso = obterSuperficieApoioRastejador(inimigo, yAnteriorInimigo, false);
@@ -2215,7 +2273,6 @@ function atualizarInimigos() {
         const proximoX = inimigo.x + passoX;
 
         if (ehAzul) {
-          // Se estiver em plataforma suspensa sobre abismo, permanece na plataforma sem cair no vazio
           let bloqueadoPorBordaPlataforma = false;
           if (apoioAtual && apoioAtual.tipo === "plataforma") {
             const plat = apoioAtual.alvo;
@@ -2243,7 +2300,6 @@ function atualizarInimigos() {
             inimigo.estado = "saltando_azul";
             inimigo.vx = inimigo.direcaoOlhar * Math.max(3.8, inimigo.velocidadeAtaque * 2.15);
 
-            // Pulo baixo e calculado apenas para vencer a altura do obstáculo ou buraco
             if (devePularObstaculo && obsAFrente) {
               const gRastejador = GRAVIDADE * 0.85;
               const impulsoCalculado = Math.sqrt(2 * gRastejador * (obsAFrente.altura + 8));
@@ -2266,7 +2322,6 @@ function atualizarInimigos() {
             inimigo.x = proximoX;
           }
         } else {
-          // Rastejador marrom: cava túnel em "U" ao encontrar obstáculo
           const infoAbismo = noChaoPrincipal
             ? rastejadorAtingiriaAbismo(proximoX, inimigo.largura, inimigo.direcaoOlhar, 0)
             : { atingiria: false, pulavel: false, abismo: null };
@@ -2415,7 +2470,6 @@ function atualizarInimigos() {
           inimigo.estado = "atacando";
         }
       } else {
-        // Parado esperando em cima da plataforma, rocha ou chão
         inimigo.ocultoNaTerra = false;
         inimigo.vx = 0;
         inimigo.vy = 0;
@@ -2470,10 +2524,9 @@ function atualizarInimigos() {
     ) {
       const direcaoImpacto =
         soldado.x + soldado.largura / 2 < inimigo.x + inimigo.largura / 2 ? -1 : 1;
-      aplicarDanoSoldado(15, direcaoImpacto);
+      aplicarDanoSoldado(1, direcaoImpacto);
     }
 
-    // Só remove inimigos que já ficaram para trás da câmera ou saíram do limite final da fase
     const foraEsquerda = inimigo.x + inimigo.largura < estadoJogo.cameraX - 180;
     const foraLimiteMapa = inimigo.x > configNivel.distanciaMeta + 240;
     if (foraEsquerda || foraLimiteMapa) {
@@ -2511,7 +2564,7 @@ function atualizarBoss() {
   if (colidiu(soldado, boss)) {
     const direcaoImpacto =
       soldado.x + soldado.largura / 2 < boss.x + boss.largura / 2 ? -1 : 1;
-    aplicarDanoSoldado(20, direcaoImpacto);
+    aplicarDanoSoldado(1, direcaoImpacto);
   }
 }
 
@@ -2561,6 +2614,10 @@ function criarAnimacaoBalaPocando(tiro, bloco, corBase = "#ffd43b") {
     py = bloco.y + bloco.altura;
     normalX = 0;
     normalY = 1;
+  } else if (tiro.vy > 0) {
+    py = bloco.y;
+    normalX = 0;
+    normalY = -1;
   }
 
   estadoJogo.efeitosImpacto.push({
@@ -2599,6 +2656,16 @@ function atualizarProjeteis() {
     const obstaculoBloqueador = encontrarObstaculoBloqueadorTiro(tiro);
     if (obstaculoBloqueador) {
       criarAnimacaoBalaPocando(tiro, obstaculoBloqueador, "#ffd43b");
+      estadoJogo.tirosJogador.splice(i, 1);
+      continue;
+    }
+
+    if (
+      tiro.vy > 0 &&
+      tiro.y + tiro.altura >= CHAO_Y &&
+      !encontrarAbismoSobrePe(tiro.x + tiro.largura / 2)
+    ) {
+      criarAnimacaoBalaPocando(tiro, { x: tiro.x, y: CHAO_Y, largura: 14, altura: 10 }, "#ffd43b");
       estadoJogo.tirosJogador.splice(i, 1);
       continue;
     }
@@ -2687,7 +2754,7 @@ function atualizarProjeteis() {
 
     if (colidiu(tiro, hitboxSoldado)) {
       const direcaoImpacto = tiro.vx < 0 ? -1 : 1;
-      aplicarDanoSoldado(tiro.tipo === "acido" ? 14 : 12, direcaoImpacto);
+      aplicarDanoSoldado(1, direcaoImpacto);
       estadoJogo.tirosInimigos.splice(i, 1);
       continue;
     }
@@ -2732,12 +2799,13 @@ function atualizarParticulasDano() {
   }
 }
 
-function aplicarDanoSoldado(dano, direcaoImpacto = -1) {
+function aplicarDanoSoldado(dano = 1, direcaoImpacto = -1) {
   if (estadoJogo.status !== "jogando") return;
   if (estadoJogo.frameAtual < estadoJogo.invulneravelAte) return;
 
   tocarSfxDano();
-  soldado.vida = Math.max(0, soldado.vida - dano);
+  const coracoesPerdidos = Math.max(1, Math.min(soldado.vidaMaxima, Math.round(dano) || 1));
+  soldado.vida = Math.max(0, soldado.vida - coracoesPerdidos);
   estadoJogo.invulneravelAte = estadoJogo.frameAtual + 45;
   estadoJogo.danoSoldadoFrames = 16;
   estadoJogo.pulsoTelaDano = 12;
@@ -2747,6 +2815,7 @@ function aplicarDanoSoldado(dano, direcaoImpacto = -1) {
   if (soldado.noChao) {
     soldado.vy = -4.5;
     soldado.noChao = false;
+    soldado.plataformaAtual = null;
   }
   estadoJogo.inclinacaoDano = -dir * soldado.direcao * 0.28;
 
@@ -2809,33 +2878,137 @@ function desenharBarraVidaInimigo(inimigo) {
   ctx.restore();
 }
 
-function desenharHudNoCanvas(configNivel) {
-  const pct =
-    configNivel.numero < NIVEIS.length
-      ? Math.min(100, Math.floor((soldado.x / (configNivel.distanciaMeta - 40)) * 100))
-      : estadoJogo.boss
-      ? 50
-      : 100;
+function desenharCoracaoHud(cx, cy, tamanho, cheio, escala = 1) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(escala, escala);
+
+  const s = tamanho / 2;
+  ctx.beginPath();
+  ctx.moveTo(0, s * 0.88);
+  ctx.bezierCurveTo(-s * 1.15, s * 0.12, -s * 1.15, -s * 0.78, -s * 0.48, -s * 0.78);
+  ctx.bezierCurveTo(-s * 0.15, -s * 0.78, 0, -s * 0.45, 0, -s * 0.25);
+  ctx.bezierCurveTo(0, -s * 0.45, s * 0.15, -s * 0.78, s * 0.48, -s * 0.78);
+  ctx.bezierCurveTo(s * 1.15, -s * 0.78, s * 1.15, s * 0.12, 0, s * 0.88);
+  ctx.closePath();
+
+  if (cheio) {
+    const grad = ctx.createLinearGradient(0, -s * 0.8, 0, s * 0.9);
+    grad.addColorStop(0, "#ff6b6b");
+    grad.addColorStop(0.55, "#f03e3e");
+    grad.addColorStop(1, "#a61e1e");
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = "#2b090d";
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+    ctx.beginPath();
+    ctx.ellipse(-s * 0.42, -s * 0.36, s * 0.22, s * 0.13, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.fillStyle = "rgba(15, 23, 42, 0.65)";
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = "rgba(148, 163, 184, 0.42)";
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function desenharEstrelaPontosHud(cx, cy, raioExterno) {
+  const raioInterno = raioExterno * 0.48;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const angulo = -Math.PI / 2 + (i * Math.PI) / 5;
+    const r = i % 2 === 0 ? raioExterno : raioInterno;
+    const px = Math.cos(angulo) * r;
+    const py = Math.sin(angulo) * r;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+
+  const gradEstrela = ctx.createLinearGradient(0, -raioExterno, 0, raioExterno);
+  gradEstrela.addColorStop(0, "#ffe066");
+  gradEstrela.addColorStop(1, "#f08c00");
+  ctx.fillStyle = gradEstrela;
+  ctx.fill();
+
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = "#3b2304";
+  ctx.stroke();
+  ctx.restore();
+}
+
+function desenharHudNoCanvas() {
+  const pontosTexto = String(estadoJogo.pontuacao);
 
   ctx.save();
-  ctx.fillStyle = "rgba(15, 23, 42, 0.78)";
-  ctx.strokeStyle = "#2f3e52";
-  ctx.lineWidth = 1.5;
+  ctx.font = "bold 15px Segoe UI, sans-serif";
+  const larguraValorPontos = ctx.measureText(pontosTexto).width;
+  ctx.font = "600 10px Segoe UI, sans-serif";
+  const larguraRotuloPontos = ctx.measureText("PONTOS").width;
+  const larguraBlocoPontos = Math.max(larguraValorPontos, larguraRotuloPontos);
+
+  const xCard = 16;
+  const yCard = 14;
+  const alturaCard = 38;
+  const larguraCoracoes = soldado.vidaMaxima * 24;
+  const larguraCard = 16 + larguraCoracoes + 18 + 20 + larguraBlocoPontos + 18;
+
+  ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 3;
+
+  const gradCard = ctx.createLinearGradient(xCard, yCard, xCard, yCard + alturaCard);
+  gradCard.addColorStop(0, "rgba(22, 31, 45, 0.86)");
+  gradCard.addColorStop(1, "rgba(12, 17, 26, 0.86)");
+  ctx.fillStyle = gradCard;
   ctx.beginPath();
-  ctx.roundRect(14, 12, 430, 28, 6);
+  ctx.roundRect(xCard, yCard, larguraCard, alturaCard, 12);
   ctx.fill();
+
+  ctx.shadowColor = "transparent";
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+
+  ctx.strokeStyle = "rgba(240, 180, 41, 0.38)";
+  ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  const miraTag = soldado.mirandoParado ? "  |  MIRA TRAVADA (K/X)" : "";
-  ctx.fillStyle = "#e6edf3";
-  ctx.font = "bold 12px Segoe UI, sans-serif";
+  const pulsoDano =
+    estadoJogo.danoSoldadoFrames > 0
+      ? 1 + Math.sin(estadoJogo.danoSoldadoFrames * 0.8) * 0.14
+      : 1;
+
+  const centroY = yCard + alturaCard / 2;
+  for (let i = 0; i < soldado.vidaMaxima; i++) {
+    const cheio = i < soldado.vida;
+    const cx = xCard + 24 + i * 24;
+    desenharCoracaoHud(cx, centroY + 1, 18, cheio, cheio ? pulsoDano : 1);
+  }
+
+  const estrelaX = xCard + 16 + larguraCoracoes + 20;
+  desenharEstrelaPontosHud(estrelaX, centroY, 7.5);
+
+  const textoX = estrelaX + 14;
   ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.fillText(
-    `FASE ${configNivel.numero}/3   |   VIDA ${soldado.vida}   |   PONTOS ${estadoJogo.pontuacao}   |   ${pct}%${miraTag}`,
-    24,
-    26
-  );
+  ctx.textBaseline = "alphabetic";
+
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "600 9px Segoe UI, sans-serif";
+  ctx.fillText("PONTOS", textoX, yCard + 14);
+
+  ctx.fillStyle = "#f8fafc";
+  ctx.font = "bold 15px Segoe UI, sans-serif";
+  ctx.fillText(pontosTexto, textoX, yCard + 30);
+
   ctx.restore();
 }
 
@@ -3341,12 +3514,9 @@ function desenharChaoComAbismosSemFundo(configNivel) {
       ctx.fillRect(cursorX, CHAO_Y, larguraSegmento, 6);
     }
 
-    ctx.fillStyle = "#08090d";
-    ctx.fillRect(ab.x, CHAO_Y, ab.largura, alturaChao);
-
     ctx.fillStyle = "#3a3242";
-    ctx.fillRect(ab.x - 4, CHAO_Y, 6, 10);
-    ctx.fillRect(ab.x + ab.largura - 2, CHAO_Y, 6, 10);
+    ctx.fillRect(ab.x - 4, CHAO_Y, 4, alturaChao);
+    ctx.fillRect(ab.x + ab.largura, CHAO_Y, 4, alturaChao);
 
     cursorX = ab.x + ab.largura;
   }
@@ -3400,7 +3570,6 @@ function desenharEstruturasQuebradas() {
 function desenharTetoCaverna(configNivel) {
   const limiteMundo = configNivel.distanciaMeta + 300;
 
-  // 1. Camada profunda da abóbada rochosa (parallax mais lento para dar profundidade)
   ctx.save();
   ctx.translate(-estadoJogo.cameraX * 0.4, 0);
   ctx.fillStyle = "#0e121b";
@@ -3417,7 +3586,6 @@ function desenharTetoCaverna(configNivel) {
   ctx.fill();
   ctx.restore();
 
-  // 2. Camada principal do teto de rocha e estalactites presas diretamente na pedra
   ctx.save();
   ctx.translate(-estadoJogo.cameraX * 0.65, 0);
 
@@ -3430,7 +3598,6 @@ function desenharTetoCaverna(configNivel) {
     pontosContorno.push({ x: sx + 64, y: baseTeto - 4 });
   }
 
-  // Massa principal de rocha do teto
   ctx.fillStyle = "#191e2b";
   ctx.beginPath();
   ctx.moveTo(pontosContorno[0].x, 0);
@@ -3441,7 +3608,6 @@ function desenharTetoCaverna(configNivel) {
   ctx.closePath();
   ctx.fill();
 
-  // Facetas internas de pedra para textura rochosa
   for (let i = 0; i < pontosContorno.length - 2; i += 2) {
     const p1 = pontosContorno[i];
     const p2 = pontosContorno[i + 1];
@@ -3458,7 +3624,6 @@ function desenharTetoCaverna(configNivel) {
     ctx.fill();
   }
 
-  // Estalactites partindo da borda inferior do teto rochoso
   for (let sx = 40; sx < limiteMundo; sx += passoRocha) {
     const baseTeto = 24 + ((Math.abs(sx) * 17) % 18);
     const comp = 22 + ((sx * 13) % 28);
@@ -3480,7 +3645,6 @@ function desenharTetoCaverna(configNivel) {
     ctx.fill();
   }
 
-  // Borda inferior iluminada da rocha do teto
   ctx.strokeStyle = "#343e56";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -3495,14 +3659,14 @@ function desenharTetoCaverna(configNivel) {
 }
 
 function desenharCenarioCaverna(configNivel) {
-  const gradCeu = ctx.createLinearGradient(0, 0, 0, CHAO_Y);
+  const gradCeu = ctx.createLinearGradient(0, 0, 0, canvas.height);
   gradCeu.addColorStop(0, "#090c12");
-  gradCeu.addColorStop(0.5, "#151b27");
-  gradCeu.addColorStop(1, "#26212d");
+  gradCeu.addColorStop(0.45, "#151b27");
+  gradCeu.addColorStop(0.86, "#26212d");
+  gradCeu.addColorStop(1, "#1e1a24");
   ctx.fillStyle = gradCeu;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Pilares rochosos de fundo e cristais distantes conectando teto e chão
   ctx.save();
   ctx.translate(-estadoJogo.cameraX * 0.25, 0);
   for (let px = 190; px < configNivel.distanciaMeta; px += 460) {
@@ -3511,8 +3675,8 @@ function desenharCenarioCaverna(configNivel) {
     ctx.moveTo(px - 28, 25);
     ctx.lineTo(px + 28, 25);
     ctx.lineTo(px + 18, CHAO_Y * 0.52);
-    ctx.lineTo(px + 34, CHAO_Y);
-    ctx.lineTo(px - 34, CHAO_Y);
+    ctx.lineTo(px + 38, canvas.height);
+    ctx.lineTo(px - 38, canvas.height);
     ctx.lineTo(px - 18, CHAO_Y * 0.52);
     ctx.closePath();
     ctx.fill();
@@ -3529,7 +3693,6 @@ function desenharCenarioCaverna(configNivel) {
   }
   ctx.restore();
 
-  // Teto de rocha e estalactites
   desenharTetoCaverna(configNivel);
 
   ctx.save();
@@ -4025,6 +4188,8 @@ function desenharSoldado() {
     anguloArma = Math.atan2(dyLocal, dxLocal === 0 ? 0.0001 : dxLocal);
   } else if (soldado.olhandoCima) {
     anguloArma = -Math.PI / 2;
+  } else if (soldado.olhandoBaixo) {
+    anguloArma = Math.PI / 2;
   }
 
   if (soldado.deitado) {
@@ -4324,7 +4489,7 @@ function desenharCena() {
     ctx.textAlign = "start";
   }
 
-  desenharHudNoCanvas(configNivel);
+  desenharHudNoCanvas();
   desenharAcaoVitoriaOverlay();
 }
 
